@@ -24,4 +24,5 @@ http://piklab.sf.net/files/libusb_udev_hotplug.txt (old, outdated)
 http://www.gphoto.org/doc/manual/permissions-usb.html (touches Linux and FreeBSD)
 
 5. More for FreeBSD
+
 http://people.freebsd.org/~thierry/nut_FreeBSD_HowTo.txt
