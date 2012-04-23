@@ -1,0 +1,2 @@
+picdem2.pl erase program
+picdem2.pl write $1.hex
