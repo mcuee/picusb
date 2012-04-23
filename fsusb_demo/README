@@ -1,0 +1,32 @@
+This is a quick hack to be able to talk to the 
+Microchip PICDEM FS USB Demo Board from Linux.
+
+Its based on the usb_pickit1 code and thus makes use of the libusb.
+(I used libusb 0.1.10a)
+
+License: GPL (see LICENSE for details)
+Author: Manuel Bessler (mbessler AT gmx DOT net)
+        (based on code from usb_pickit1)
+Modifications: Xiaofan Chen (xiaofanc AT gamil DOT com)
+               (port to Windows using libusb_win32 and MinGW, added --help)
+               Bill Freeman: improved temperature conversion
+	      
+
+Web: http://www.varxec.net/picdem_fs_usb/
+
+
+the following options are recognized:
+--ledon <lednumber>     turns a LED on
+--ledoff <lednumber>    turns a LED off
+--reset                 resets the board
+--readpot               reads the potentiometer value
+--readtemp              reads the temperature
+
+Only one of these options can be specified due to the very simple commandline
+parsing currently implemented.
+
+Valid lednumbers are 3 and 4 (a limitation of the board firmware).
+
+The temperature calculation is still off (at least in the neg. degrees 
+celcius range)
+
