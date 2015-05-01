@@ -11,46 +11,48 @@ libftdi: http://www.intra2net.com/en/developer/libftdi/
 
 OpenOCD: http://openocd.berlios.de/web/
 
+
 For more information about PIC related stuff, please refer to the following Microchip forum threads.
 
 http://www.microchip.com/forums/tm.aspx?m=235427
 
 http://www.microchip.com/forums/tm.aspx?m=123533
 
-For fsusb and fsusb_demo, please refer to the original websites and the following Microchip forum thread. Take note I am not the original author. I just made a few minor modifications.
+For fsusb and fsusb\_demo, please refer to the original websites and the following Microchip forum thread. Take note I am not the original author. I just made a few minor modifications.
 
-PICDEM FS USB bootloader for Linux/Windows using libusb.
+PICDEM FS USB bootloader for Linux/Windows using libusb. <p>
 
-http://www.internetking.org/fsusb/
+<a href='http://www.internetking.org/fsusb/'>http://www.internetking.org/fsusb/</a>
 
-http://forum.microchip.com/tm.aspx?m=106426
+<a href='http://forum.microchip.com/tm.aspx?m=106426'>http://forum.microchip.com/tm.aspx?m=106426</a>
 
-PICDEM FS USB demo appliation under Linux/Windows using libusb
+PICDEM FS USB demo appliation under Linux/Windows using libusb<br>
+<br>
+<a href='http://www.varxec.net/picdem_fs_usb/'>http://www.varxec.net/picdem_fs_usb/</a> (dead link now)<br>
+<br>
+<a href='http://forum.microchip.com/tm.aspx?m=106426'>http://forum.microchip.com/tm.aspx?m=106426</a>
 
-http://www.varxec.net/picdem_fs_usb/ (dead link now)
+I also wrote some simple libusb based programs. Please take note I am not a good C programmer. Therefore you are welcome to send comments to me by using Microchip forum or maybe using libusb mailing list.<br>
+<br>
+1) for Jan Axelson's WinUSB example<br>
+<br>
+<a href='http://www.microchip.com/forums/tm.aspx?m=340892'>http://www.microchip.com/forums/tm.aspx?m=340892</a>
 
-http://forum.microchip.com/tm.aspx?m=106426
+2) for Jan Axelson's Generic HID program<br>
+<br>
+<a href='http://www.microchip.com/forums/tm.aspx?m=340898'>http://www.microchip.com/forums/tm.aspx?m=340898</a>
 
-I also wrote some simple libusb based programs. Please take note I am not a good C programmer. Therefore you are welcome to send comments to me by using Microchip forum or maybe using libusb mailing list.
+3) for generic isochronous transfer example (take note that the firmware is not a proper isochronous device as there is no zero-bandwidth interface).<br>
+<br>
+<a href='http://www.microchip.com/forums/fb.aspx?m=272277'>http://www.microchip.com/forums/fb.aspx?m=272277</a>
 
-1) for Jan Axelson's WinUSB example
 
-http://www.microchip.com/forums/tm.aspx?m=340892
+For Jan Axelson's firmware and PC host codes (Windows only), please refer to her website.<br>
+<br>
+<a href='http://www.lvr.com/'>http://www.lvr.com/</a>
 
-2) for Jan Axelson's Generic HID program
-
-http://www.microchip.com/forums/tm.aspx?m=340898
-
-3) for generic isochronous transfer example (take note that the firmware is not a proper isochronous device as there is no zero-bandwidth interface).
-
-http://www.microchip.com/forums/fb.aspx?m=272277
-
-For Jan Axelson's firmware and PC host codes (Windows only), please refer to her website.
-
-http://www.lvr.com/
-
-New: 30-Dec-2011
-
-Some of the codes are now in github repositories.
-
-https://github.com/mcuee
+New: 30-Dec-2011<br>
+<br>
+Some of the codes are now in github repositories.<br>
+<br>
+<a href='https://github.com/mcuee'>https://github.com/mcuee</a>
