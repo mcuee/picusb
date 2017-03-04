@@ -3,13 +3,13 @@ Automatically exported from code.google.com/p/picusb
 
 This page is mainly related to code and resources for Microchip USB PICs and libusb/libusb-win32 and libusb related stuff. For example, I may publish test binaries for libusb related projects (libusb-1.0 Windows backend, libusb-win32, libftdi and libftdi-1.0, OpenOCD windows binary). These test binaries are only for testing purpose and please follow the license (LGPL or GPL).
 
-libusb: http://www.libusb.org/
+libusb: http://www.libusb.info/
 
 libusb-win32 http://libusb-win32.sourceforge.net/
 
 libftdi: http://www.intra2net.com/en/developer/libftdi/
 
-OpenOCD: http://openocd.berlios.de/web/
+OpenOCD: http://openocd.org/
 
 
 For more information about PIC related stuff, please refer to the following Microchip forum threads.
