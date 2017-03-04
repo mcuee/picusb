@@ -49,7 +49,7 @@ I also wrote some simple libusb based programs. Please take note I am not a good
 
 For Jan Axelson's firmware and PC host codes (Windows only), please refer to her website.<br>
 <br>
-<a href='http://www.lvr.com/'>http://www.lvr.com/</a>
+<a href='http://janaxelson.com/'>http://janaxelson.com/</a>
 
 New: 30-Dec-2011<br>
 <br>
