@@ -18,9 +18,9 @@ http://www.microchip.com/forums/tm.aspx?m=235427
 
 http://www.microchip.com/forums/tm.aspx?m=123533
 
-For fsusb and fsusb\_demo, please refer to the original websites and the following Microchip forum thread. Take note I am not the original author. I just made a few minor modifications.
+For fsusb and fsusb_demo, please refer to the original websites and the following Microchip forum thread. Take note I am not the original author. I just made a few minor modifications.
 
-PICDEM FS USB bootloader for Linux/Windows using libusb. <p>
+PICDEM FS USB bootloader for Linux/Windows using libusb.
 
 http://www.internetking.org/fsusb/ 
 
@@ -28,7 +28,7 @@ https://www.microchip.com/forums/tm.aspx?m=106426
 
 PICDEM FS USB demo appliation under Linux/Windows using libusb
   
-http://www.varxec.net/picdem_fs_usb/ (dead link now)<br>
+http://www.varxec.net/picdem_fs_usb/ (dead link now)
 
 https://www.microchip.com/forums/tm.aspx?m=106426
 
@@ -41,9 +41,8 @@ http://www.microchip.com/forums/tm.aspx?m=340892
 http://www.microchip.com/forums/tm.aspx?m=340898
 
 3) for generic isochronous transfer example (take note that the firmware is not a proper isochronous device as there is no zero-bandwidth interface).
- 
 http://www.microchip.com/forums/fb.aspx?m=272277
 
-For Jan Axelson's firmware and PC host codes (Windows only), please refer to her website.<br>
+4) For Jan Axelson's firmware and PC host codes (Windows only), please refer to her website.<br>
 http://janaxelson.com/
 
