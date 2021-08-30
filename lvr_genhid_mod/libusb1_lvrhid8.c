@@ -25,7 +25,6 @@
 
 const static int PACKET_CTRL_LEN=3; 
 const static int PACKET_INT_LEN=3;
-const static int INTERFACE=0;
 const static int ENDPOINT_INT_IN=0x81; /* endpoint 0x81 address for IN */
 const static int ENDPOINT_INT_OUT=0x01; /* endpoint 1 address for OUT */
 const static int TIMEOUT=5000; /* timeout in ms */
