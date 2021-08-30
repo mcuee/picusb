@@ -35,18 +35,15 @@ https://www.microchip.com/forums/tm.aspx?m=106426
 I also wrote some simple libusb based programs. Please take note I am not a good C programmer. Therefore you are welcome to send comments to me by using Microchip forum or maybe using libusb mailing list.
 
 1) for Jan Axelson's WinUSB example<br>
-
 http://www.microchip.com/forums/tm.aspx?m=340892
 
 2) for Jan Axelson's Generic HID program<br>
-
 http://www.microchip.com/forums/tm.aspx?m=340898
 
 3) for generic isochronous transfer example (take note that the firmware is not a proper isochronous device as there is no zero-bandwidth interface).
-  
+ 
 http://www.microchip.com/forums/fb.aspx?m=272277
 
 For Jan Axelson's firmware and PC host codes (Windows only), please refer to her website.<br>
-
 http://janaxelson.com/
 
