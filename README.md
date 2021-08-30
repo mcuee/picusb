@@ -13,6 +13,7 @@ OpenOCD: http://openocd.org/
 
 
 For more information about PIC related stuff, please refer to the following Microchip forum threads.
+
 http://www.microchip.com/forums/tm.aspx?m=235427
 
 http://www.microchip.com/forums/tm.aspx?m=123533
@@ -20,11 +21,13 @@ http://www.microchip.com/forums/tm.aspx?m=123533
 For fsusb and fsusb_demo, please refer to the original websites and the following Microchip forum thread. Take note I am not the original author. I just made a few minor modifications.
 
 PICDEM FS USB bootloader for Linux/Windows using libusb.
+
 http://www.internetking.org/fsusb/ 
 
 https://www.microchip.com/forums/tm.aspx?m=106426
 
 PICDEM FS USB demo appliation under Linux/Windows using libusb
+
 http://www.varxec.net/picdem_fs_usb/ (dead link now)
 
 https://www.microchip.com/forums/tm.aspx?m=106426
