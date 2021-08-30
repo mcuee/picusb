@@ -22,9 +22,9 @@ For fsusb and fsusb\_demo, please refer to the original websites and the followi
 
 PICDEM FS USB bootloader for Linux/Windows using libusb. <p>
 
-<a href='http://www.internetking.org/fsusb/'>http://www.internetking.org/fsusb/</a>
+http://www.internetking.org/fsusb/ 
 
-<a href='http://forum.microchip.com/tm.aspx?m=106426'>http://forum.microchip.com/tm.aspx?m=106426</a>
+https://www.microchip.com/forums/tm.aspx?m=106426
 
 PICDEM FS USB demo appliation under Linux/Windows using libusb<br>
 <br>
