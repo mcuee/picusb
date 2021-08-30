@@ -26,33 +26,27 @@ http://www.internetking.org/fsusb/
 
 https://www.microchip.com/forums/tm.aspx?m=106426
 
-PICDEM FS USB demo appliation under Linux/Windows using libusb<br>
-<br>
-<a href='http://www.varxec.net/picdem_fs_usb/'>http://www.varxec.net/picdem_fs_usb/</a> (dead link now)<br>
-<br>
-<a href='http://forum.microchip.com/tm.aspx?m=106426'>http://forum.microchip.com/tm.aspx?m=106426</a>
+PICDEM FS USB demo appliation under Linux/Windows using libusb
+  
+http://www.varxec.net/picdem_fs_usb/ (dead link now)<br>
 
-I also wrote some simple libusb based programs. Please take note I am not a good C programmer. Therefore you are welcome to send comments to me by using Microchip forum or maybe using libusb mailing list.<br>
-<br>
+https://www.microchip.com/forums/tm.aspx?m=106426
+
+I also wrote some simple libusb based programs. Please take note I am not a good C programmer. Therefore you are welcome to send comments to me by using Microchip forum or maybe using libusb mailing list.
+
 1) for Jan Axelson's WinUSB example<br>
-<br>
-<a href='http://www.microchip.com/forums/tm.aspx?m=340892'>http://www.microchip.com/forums/tm.aspx?m=340892</a>
+
+http://www.microchip.com/forums/tm.aspx?m=340892
 
 2) for Jan Axelson's Generic HID program<br>
-<br>
-<a href='http://www.microchip.com/forums/tm.aspx?m=340898'>http://www.microchip.com/forums/tm.aspx?m=340898</a>
 
-3) for generic isochronous transfer example (take note that the firmware is not a proper isochronous device as there is no zero-bandwidth interface).<br>
-<br>
-<a href='http://www.microchip.com/forums/fb.aspx?m=272277'>http://www.microchip.com/forums/fb.aspx?m=272277</a>
+http://www.microchip.com/forums/tm.aspx?m=340898
 
+3) for generic isochronous transfer example (take note that the firmware is not a proper isochronous device as there is no zero-bandwidth interface).
+  
+http://www.microchip.com/forums/fb.aspx?m=272277
 
 For Jan Axelson's firmware and PC host codes (Windows only), please refer to her website.<br>
-<br>
-<a href='http://janaxelson.com/'>http://janaxelson.com/</a>
 
-New: 30-Dec-2011<br>
-<br>
-Some of the codes are now in github repositories.<br>
-<br>
-<a href='https://github.com/mcuee'>https://github.com/mcuee</a>
+http://janaxelson.com/
+
