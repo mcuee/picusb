@@ -16,7 +16,6 @@
 const static int PACKET_CTRL_LEN=2; 
 const static int PACKET_INT_LEN=2;
 const static int PACKET_BULK_LEN=64;
-const static int INTERFACE=0;
 const static int ENDPOINT_INT_IN=0x82; /* endpoint 0x81 address for IN */
 const static int ENDPOINT_INT_OUT=0x02; /* endpoint 1 address for OUT */
 const static int ENDPOINT_BULK_IN=0x81; /* endpoint 0x81 address for IN */
@@ -137,7 +136,6 @@ static int test_bulk_transfer(void)
 
 int main(void)
 {
-	struct sigaction sigact;
 	int r = 1;
 
 	r = libusb_init(NULL);
