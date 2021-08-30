@@ -1,4 +1,3 @@
-#labels Featured,Phase-Support
 =libusb and udev=
 
 One issue about libusb under Linux and BSDs is how to run the program without using the root privilege. 
