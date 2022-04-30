@@ -1,0 +1,16 @@
+1. ASM based PIC USB Stqack
+Discussion here:
+https://www.microchip.com/forums/m89669.aspx
+
+Download the codes here.
+http://web.archive.org/web/20120108012411/http://pe.ece.olin.edu/ece/projects.html
+
+Some modifications here
+http://jap.hu/electronic/pic18-usb.html
+
+2. SDCC based PIC USB Stack
+Discussion here:
+https://www.microchip.com/forums/tm.aspx?m=170553
+
+Rebuilt here
+https://www.microchip.com/forums/tm.aspx?m=382900
