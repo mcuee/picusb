@@ -1,0 +1,410 @@
+C51 COMPILER V7.06   FW                                                                    07/30/2014 13:23:29 PAGE 1   
+
+
+C51 COMPILER V7.06, COMPILATION OF MODULE FW
+OBJECT MODULE PLACED IN fw.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE fw.c BROWSE DEBUG OBJECTEXTEND
+
+stmt level    source
+
+   1          //-----------------------------------------------------------------------------
+   2          //   File:      fw.c
+   3          //   Contents:  Firmware frameworks task dispatcher and device request parser
+   4          //
+   5          // $Archive: /USB/Examples/FX2LP/bulkext/fw.c $
+   6          // $Date: 3/23/05 2:53p $
+   7          // $Revision: 8 $
+   8          //
+   9          //
+  10          //-----------------------------------------------------------------------------
+  11          // Copyright 2003, Cypress Semiconductor Corporation
+  12          //-----------------------------------------------------------------------------
+  13          
+  14          
+  15          #include "fx2.h"
+  16          #include "fx2regs.h"
+  17          #include "syncdly.h"            // SYNCDELAY macro
+  18          
+  19          //-----------------------------------------------------------------------------
+  20          // Constants
+  21          //-----------------------------------------------------------------------------
+  22          #define DELAY_COUNT   0x9248*8L  // Delay for 8 sec at 24Mhz, 4 sec at 48
+  23          #define _IFREQ  48000            // IFCLK constant for Synchronization Delay
+  24          #define _CFREQ  48000            // CLKOUT constant for Synchronization Delay
+  25          
+  26          //-----------------------------------------------------------------------------
+  27          // Random Macros
+  28          //-----------------------------------------------------------------------------
+  29          #define   min(a,b) (((a)<(b))?(a):(b))
+  30          #define   max(a,b) (((a)>(b))?(a):(b))
+  31          
+  32          //-----------------------------------------------------------------------------
+  33          // Global Variables
+  34          //-----------------------------------------------------------------------------
+  35          volatile BOOL   GotSUD;
+  36          BOOL      Rwuen;
+  37          BOOL      Selfpwr;
+  38          volatile BOOL   Sleep;                  // Sleep mode enable flag
+  39          
+  40          WORD   pDeviceDscr;   // Pointer to Device Descriptor; Descriptors may be moved
+  41          WORD   pDeviceQualDscr;
+  42          WORD   pHighSpeedConfigDscr;
+  43          WORD   pFullSpeedConfigDscr;   
+  44          WORD   pConfigDscr;
+  45          WORD   pOtherConfigDscr;   
+  46          WORD   pStringDscr;   
+  47          
+  48          //-----------------------------------------------------------------------------
+  49          // Prototypes
+  50          //-----------------------------------------------------------------------------
+  51          void SetupCommand(void);
+  52          void TD_Init(void);
+  53          void TD_Poll(void);
+  54          BOOL TD_Suspend(void);
+  55          BOOL TD_Resume(void);
+C51 COMPILER V7.06   FW                                                                    07/30/2014 13:23:29 PAGE 2   
+
+  56          
+  57          BOOL DR_GetDescriptor(void);
+  58          BOOL DR_SetConfiguration(void);
+  59          BOOL DR_GetConfiguration(void);
+  60          BOOL DR_SetInterface(void);
+  61          BOOL DR_GetInterface(void);
+  62          BOOL DR_GetStatus(void);
+  63          BOOL DR_ClearFeature(void);
+  64          BOOL DR_SetFeature(void);
+  65          BOOL DR_VendorCmnd(void);
+  66          
+  67          // this table is used by the epcs macro 
+  68          const char code  EPCS_Offset_Lookup_Table[] =
+  69          {
+  70             0,    // EP1OUT
+  71             1,    // EP1IN
+  72             2,    // EP2OUT
+  73             2,    // EP2IN
+  74             3,    // EP4OUT
+  75             3,    // EP4IN
+  76             4,    // EP6OUT
+  77             4,    // EP6IN
+  78             5,    // EP8OUT
+  79             5,    // EP8IN
+  80          };
+  81          
+  82          // macro for generating the address of an endpoint's control and status register (EPnCS)
+  83          #define epcs(EP) (EPCS_Offset_Lookup_Table[(EP & 0x7E) | (EP > 128)] + 0xE6A1)
+  84          
+  85          //-----------------------------------------------------------------------------
+  86          // Code
+  87          //-----------------------------------------------------------------------------
+  88          
+  89          // Task dispatcher
+  90          void main(void)
+  91          {
+  92   1         DWORD   i;
+  93   1         WORD   offset;
+  94   1         DWORD   DevDescrLen;
+  95   1         DWORD   j=0;
+  96   1         WORD   IntDescrAddr;
+  97   1         WORD   ExtDescrAddr;
+  98   1      
+  99   1         // Initialize Global States
+ 100   1         Sleep = FALSE;               // Disable sleep mode
+ 101   1         Rwuen = FALSE;               // Disable remote wakeup
+ 102   1         Selfpwr = FALSE;            // Disable self powered
+ 103   1         GotSUD = FALSE;               // Clear "Got setup data" flag
+ 104   1      
+ 105   1         // Initialize user device
+ 106   1         TD_Init();
+ 107   1      
+ 108   1         // The following section of code is used to relocate the descriptor table. 
+ 109   1         // The frameworks uses SUDPTRH and SUDPTRL to automate the SETUP requests
+ 110   1         // for descriptors.  These registers only work with memory locations
+ 111   1         // in the EZ-USB internal RAM.  Therefore, if the descriptors are located
+ 112   1         // in external RAM, they must be copied to in internal RAM.  
+ 113   1         // The descriptor table is relocated by the frameworks ONLY if it is found 
+ 114   1         // to be located in external memory.
+ 115   1         pDeviceDscr = (WORD)&DeviceDscr;
+ 116   1         pDeviceQualDscr = (WORD)&DeviceQualDscr;
+ 117   1         pHighSpeedConfigDscr = (WORD)&HighSpeedConfigDscr;
+C51 COMPILER V7.06   FW                                                                    07/30/2014 13:23:29 PAGE 3   
+
+ 118   1         pFullSpeedConfigDscr = (WORD)&FullSpeedConfigDscr;
+ 119   1         pStringDscr = (WORD)&StringDscr;
+ 120   1      
+ 121   1         // Is the descriptor table in external RAM (> 16Kbytes)?  If yes,
+ 122   1         // then relocate.
+ 123   1         // Note that this code only checks if the descriptors START in 
+ 124   1         // external RAM.  It will not work if the descriptor table spans
+ 125   1         // internal and external RAM.
+ 126   1         if ((WORD)&DeviceDscr & 0xC000)
+ 127   1         {
+ 128   2            // first, relocate the descriptors
+ 129   2            IntDescrAddr = INTERNAL_DSCR_ADDR;
+ 130   2            ExtDescrAddr = (WORD)&DeviceDscr;
+ 131   2            DevDescrLen = (WORD)&UserDscr - (WORD)&DeviceDscr + 2;
+ 132   2            for (i = 0; i < DevDescrLen; i++)
+ 133   2               *((BYTE xdata *)IntDescrAddr+i) = *((BYTE xdata *)ExtDescrAddr+i);
+ 134   2      
+ 135   2            // update all of the descriptor pointers
+ 136   2            pDeviceDscr = IntDescrAddr;
+ 137   2            offset = (WORD)&DeviceDscr - INTERNAL_DSCR_ADDR;
+ 138   2            pDeviceQualDscr -= offset;
+ 139   2            pConfigDscr -= offset;
+ 140   2            pOtherConfigDscr -= offset;
+ 141   2            pHighSpeedConfigDscr -= offset;
+ 142   2            pFullSpeedConfigDscr -= offset;
+ 143   2            pStringDscr -= offset;
+ 144   2         }
+ 145   1      
+ 146   1         EZUSB_IRQ_ENABLE();            // Enable USB interrupt (INT2)
+ 147   1         EZUSB_ENABLE_RSMIRQ();            // Wake-up interrupt
+ 148   1      
+ 149   1         INTSETUP |= (bmAV2EN | bmAV4EN);     // Enable INT 2 & 4 autovectoring
+ 150   1      
+ 151   1         USBIE |= bmSUDAV | bmSUTOK | bmSUSP | bmURES | bmHSGRANT;   // Enable selected interrupts
+ 152   1         EA = 1;                  // Enable 8051 interrupts
+ 153   1      
+ 154   1      #ifndef NO_RENUM
+ 155   1         // Renumerate if necessary.  Do this by checking the renum bit.  If it
+ 156   1         // is already set, there is no need to renumerate.  The renum bit will
+ 157   1         // already be set if this firmware was loaded from an eeprom.
+ 158   1         if(!(USBCS & bmRENUM))
+ 159   1         {
+ 160   2             EZUSB_Discon(TRUE);   // renumerate
+ 161   2         }
+ 162   1      #endif
+ 163   1      
+ 164   1         // unconditionally re-connect.  If we loaded from eeprom we are
+ 165   1         // disconnected and need to connect.  If we just renumerated this
+ 166   1         // is not necessary but doesn't hurt anything
+ 167   1         USBCS &=~bmDISCON;
+ 168   1      
+ 169   1         CKCON = (CKCON&(~bmSTRETCH)) | FW_STRETCH_VALUE; // Set stretch
+ 170   1      
+ 171   1         // clear the Sleep flag.
+ 172   1         Sleep = FALSE;
+ 173   1      
+ 174   1         // Task Dispatcher
+ 175   1         while(TRUE)               // Main Loop
+ 176   1         {
+ 177   2            // Poll User Device
+ 178   2            TD_Poll();
+ 179   2      
+C51 COMPILER V7.06   FW                                                                    07/30/2014 13:23:29 PAGE 4   
+
+ 180   2            // Check for pending SETUP
+ 181   2            if(GotSUD)
+ 182   2            {
+ 183   3               SetupCommand();          // Implement setup command
+ 184   3               GotSUD = FALSE;          // Clear SETUP flag
+ 185   3            }
+ 186   2      
+ 187   2            // check for and handle suspend.
+ 188   2            // NOTE: Idle mode stops the processor clock.  There are only two
+ 189   2            // ways out of idle mode, the WAKEUP pin, and detection of the USB
+ 190   2            // resume state on the USB bus.  The timers will stop and the
+ 191   2            // processor will not wake up on any other interrupts.
+ 192   2            if (Sleep)
+ 193   2            {
+ 194   3               if(TD_Suspend())
+ 195   3               { 
+ 196   4                  Sleep = FALSE;     // Clear the "go to sleep" flag.  Do it here to prevent any race condition 
+             -between wakeup and the next sleep.
+ 197   4                  do
+ 198   4                  {
+ 199   5                     EZUSB_Susp();         // Place processor in idle mode.
+ 200   5                  }
+ 201   4                  while(!Rwuen && EZUSB_EXTWAKEUP());
+ 202   4                  // above.  Must continue to go back into suspend if the host has disabled remote wakeup
+ 203   4                  // *and* the wakeup was caused by the external wakeup pin.
+ 204   4      
+ 205   4                  // 8051 activity will resume here due to USB bus or Wakeup# pin activity.
+ 206   4                  EZUSB_Resume();   // If source is the Wakeup# pin, signal the host to Resume.      
+ 207   4                  TD_Resume();
+ 208   4               }   
+ 209   3            }
+ 210   2      
+ 211   2         }
+ 212   1      }
+ 213          
+ 214          BOOL HighSpeedCapable()
+ 215          {
+ 216   1         // this function determines if the chip is high-speed capable.
+ 217   1         // FX2 and FX2LP are high-speed capable. FX1 is not - it does
+ 218   1         // not have a high-speed transceiver.
+ 219   1      
+ 220   1         if (GPCR2 & bmFULLSPEEDONLY)
+ 221   1            return FALSE;
+ 222   1         else
+ 223   1            return TRUE;
+ 224   1      }   
+ 225          
+ 226          // Device request parser
+ 227          void SetupCommand(void)
+ 228          {
+ 229   1         void   *dscr_ptr;
+ 230   1      
+ 231   1         switch(SETUPDAT[1])
+ 232   1         {
+ 233   2            case SC_GET_DESCRIPTOR:                  // *** Get Descriptor
+ 234   2               if(DR_GetDescriptor())
+ 235   2                  switch(SETUPDAT[3])         
+ 236   2                  {
+ 237   3                     case GD_DEVICE:            // Device
+ 238   3                        SUDPTRH = MSB(pDeviceDscr);
+ 239   3                        SUDPTRL = LSB(pDeviceDscr);
+ 240   3                        break;
+C51 COMPILER V7.06   FW                                                                    07/30/2014 13:23:29 PAGE 5   
+
+ 241   3                     case GD_DEVICE_QUALIFIER:            // Device Qualifier
+ 242   3                                        // only retuen a device qualifier if this is a high speed
+ 243   3                                        // capable chip.
+ 244   3                                        if (HighSpeedCapable())
+ 245   3                                        {
+ 246   4                                SUDPTRH = MSB(pDeviceQualDscr);
+ 247   4                                SUDPTRL = LSB(pDeviceQualDscr);
+ 248   4                                        }
+ 249   3                                        else
+ 250   3                                        {
+ 251   4                                                EZUSB_STALL_EP0();
+ 252   4                                        }
+ 253   3                                        break;
+ 254   3                     case GD_CONFIGURATION:         // Configuration
+ 255   3                        SUDPTRH = MSB(pConfigDscr);
+ 256   3                        SUDPTRL = LSB(pConfigDscr);
+ 257   3                        break;
+ 258   3                     case GD_OTHER_SPEED_CONFIGURATION:  // Other Speed Configuration
+ 259   3                        SUDPTRH = MSB(pOtherConfigDscr);
+ 260   3                        SUDPTRL = LSB(pOtherConfigDscr);
+ 261   3                        break;
+ 262   3                     case GD_STRING:            // String
+ 263   3                        if(dscr_ptr = (void *)EZUSB_GetStringDscr(SETUPDAT[2]))
+ 264   3                        {
+ 265   4                           SUDPTRH = MSB(dscr_ptr);
+ 266   4                           SUDPTRL = LSB(dscr_ptr);
+ 267   4                        }
+ 268   3                        else 
+ 269   3                           EZUSB_STALL_EP0();   // Stall End Point 0
+ 270   3                        break;
+ 271   3                     default:            // Invalid request
+ 272   3                        EZUSB_STALL_EP0();      // Stall End Point 0
+ 273   3                  }
+ 274   2               break;
+ 275   2            case SC_GET_INTERFACE:                  // *** Get Interface
+ 276   2               DR_GetInterface();
+ 277   2               break;
+ 278   2            case SC_SET_INTERFACE:                  // *** Set Interface
+ 279   2               DR_SetInterface();
+ 280   2               break;
+ 281   2            case SC_SET_CONFIGURATION:               // *** Set Configuration
+ 282   2               DR_SetConfiguration();
+ 283   2                      
+ 284   2               break;
+ 285   2            case SC_GET_CONFIGURATION:               // *** Get Configuration
+ 286   2               DR_GetConfiguration();
+ 287   2               break;
+ 288   2            case SC_GET_STATUS:                  // *** Get Status
+ 289   2               if(DR_GetStatus())
+ 290   2                  switch(SETUPDAT[0])
+ 291   2                  {
+ 292   3                     case GS_DEVICE:            // Device
+ 293   3                        EP0BUF[0] = ((BYTE)Rwuen << 1) | (BYTE)Selfpwr;
+ 294   3                        EP0BUF[1] = 0;
+ 295   3                        EP0BCH = 0;
+ 296   3                        EP0BCL = 2;
+ 297   3                        break;
+ 298   3                     case GS_INTERFACE:         // Interface
+ 299   3                        EP0BUF[0] = 0;
+ 300   3                        EP0BUF[1] = 0;
+ 301   3                        EP0BCH = 0;
+ 302   3                        EP0BCL = 2;
+C51 COMPILER V7.06   FW                                                                    07/30/2014 13:23:29 PAGE 6   
+
+ 303   3                        break;
+ 304   3                     case GS_ENDPOINT:         // End Point
+ 305   3                        EP0BUF[0] = *(BYTE xdata *) epcs(SETUPDAT[4]) & bmEPSTALL;
+ 306   3                        EP0BUF[1] = 0;
+ 307   3                        EP0BCH = 0;
+ 308   3                        EP0BCL = 2;
+ 309   3                        break;
+ 310   3                     default:            // Invalid Command
+ 311   3                        EZUSB_STALL_EP0();      // Stall End Point 0
+ 312   3                  }
+ 313   2               break;
+ 314   2            case SC_CLEAR_FEATURE:                  // *** Clear Feature
+ 315   2               if(DR_ClearFeature())
+ 316   2                  switch(SETUPDAT[0])
+ 317   2                  {
+ 318   3                     case FT_DEVICE:            // Device
+ 319   3                        if(SETUPDAT[2] == 1)
+ 320   3                           Rwuen = FALSE;       // Disable Remote Wakeup
+ 321   3                        else
+ 322   3                           EZUSB_STALL_EP0();   // Stall End Point 0
+ 323   3                        break;
+ 324   3                     case FT_ENDPOINT:         // End Point
+ 325   3                        if(SETUPDAT[2] == 0)
+ 326   3                        {
+ 327   4                           *(BYTE xdata *) epcs(SETUPDAT[4]) &= ~bmEPSTALL;
+ 328   4                           EZUSB_RESET_DATA_TOGGLE( SETUPDAT[4] );
+ 329   4                        }
+ 330   3                        else
+ 331   3                           EZUSB_STALL_EP0();   // Stall End Point 0
+ 332   3                        break;
+ 333   3                  }
+ 334   2               break;
+ 335   2            case SC_SET_FEATURE:                  // *** Set Feature
+ 336   2               if(DR_SetFeature())
+ 337   2                  switch(SETUPDAT[0])
+ 338   2                  {
+ 339   3                     case FT_DEVICE:            // Device
+ 340   3                        if(SETUPDAT[2] == 1)
+ 341   3                           Rwuen = TRUE;      // Enable Remote Wakeup
+ 342   3                        else if(SETUPDAT[2] == 2)
+ 343   3                           // Set Feature Test Mode.  The core handles this request.  However, it is
+ 344   3                           // necessary for the firmware to complete the handshake phase of the
+ 345   3                           // control transfer before the chip will enter test mode.  It is also
+ 346   3                           // necessary for FX2 to be physically disconnected (D+ and D-)
+ 347   3                           // from the host before it will enter test mode.
+ 348   3                           break;
+ 349   3                        else
+ 350   3                           EZUSB_STALL_EP0();   // Stall End Point 0
+ 351   3                        break;
+ 352   3                     case FT_ENDPOINT:         // End Point
+ 353   3                        *(BYTE xdata *) epcs(SETUPDAT[4]) |= bmEPSTALL;
+ 354   3                        break;
+ 355   3                     default:
+ 356   3                        EZUSB_STALL_EP0();      // Stall End Point 0
+ 357   3                  }
+ 358   2               break;
+ 359   2            default:                     // *** Invalid Command
+ 360   2               if(DR_VendorCmnd())
+ 361   2                  EZUSB_STALL_EP0();            // Stall End Point 0
+ 362   2         }
+ 363   1      
+ 364   1         // Acknowledge handshake phase of device request
+C51 COMPILER V7.06   FW                                                                    07/30/2014 13:23:29 PAGE 7   
+
+ 365   1         EP0CS |= bmHSNAK;
+ 366   1      }
+ 367          
+ 368          // Wake-up interrupt handler
+ 369          void resume_isr(void) interrupt WKUP_VECT
+ 370          {
+ 371   1         EZUSB_CLEAR_RSMIRQ();
+ 372   1      }
+ 373          
+ 374          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    941    ----
+   CONSTANT SIZE    =     10    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     14      16
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      4    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

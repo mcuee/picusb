@@ -1,0 +1,1 @@
+"..\..\Target\Lib\LP\USBJmpTb.a51" SET (SMALL) DEBUG PRINT(.\USBJmpTb.lst) OBJECT(.\USBJmpTb.obj) EP

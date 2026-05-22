@@ -1,0 +1,24 @@
+<html>
+<body>
+<pre>
+<h1>µVision2 Build Log</h1>
+<h2>Project:</h2>
+C:\Cypress\USB\CY3689 EZ-USB FX2LP DISCOVERY KIT\1.0\Firmware\Bulkloop\bulkloop.uv2
+Project File Date:  05/17/2023
+
+<h2>Output:</h2>
+Build target 'Target 1'
+compiling fw.c...
+compiling bulkloop.c...
+BULKLOOP.C(240): warning C280: 'waiting_inpkts': unreferenced local variable
+assembling dscr.a51...
+linking...
+Program Size: data=50.5 xdata=4497 code=2322
+creating hex file from "bulkloop"...
+User command #1: hex2bix -i -f 0xC2 -o bulkloop.iic bulkloop.hex
+Intel Hex file to EZ-USB Binary file conversion utility
+Copyright (c) 2012-2013, Cypress Semiconductor Inc.
+2363 Bytes written.
+Total Code Bytes = 2322
+Conversion completed successfully.
+"bulkloop" - 0 Error(s), 1 Warning(s).

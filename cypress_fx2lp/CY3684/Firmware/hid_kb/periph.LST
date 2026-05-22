@@ -1,0 +1,428 @@
+C51 COMPILER V7.06   PERIPH                                                                06/13/2012 13:36:48 PAGE 1   
+
+
+C51 COMPILER V7.06, COMPILATION OF MODULE PERIPH
+OBJECT MODULE PLACED IN periph.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE periph.c BROWSE DEBUG OBJECTEXTEND
+
+stmt level    source
+
+   1          //-----------------------------------------------------------------------------
+   2          //   File:      periph.c
+   3          //   Contents:  Hooks required to implement USB peripheral function.
+   4          //
+   5          // $Archive: /USB/Examples/FX2LP/hid_kb/periph.c $
+   6          // $Date: 3/23/05 2:58p $
+   7          // $Revision: 2 $
+   8          //
+   9          //
+  10          //-----------------------------------------------------------------------------
+  11          // Copyright 2003, Cypress Semiconductor Corporation
+  12          //
+  13          // This software is owned by Cypress Semiconductor Corporation (Cypress) and is
+  14          // protected by United States copyright laws and international treaty provisions. Cypress
+  15          // hereby grants to Licensee a personal, non-exclusive, non-transferable license to copy,
+  16          // use, modify, create derivative works of, and compile the Cypress Source Code and
+  17          // derivative works for the sole purpose of creating custom software in support of Licensee
+  18          // product ("Licensee Product") to be used only in conjunction with a Cypress integrated
+  19          // circuit. Any reproduction, modification, translation, compilation, or representation of this
+  20          // software except as specified above is prohibited without the express written permission of
+  21          // Cypress.
+  22          //
+  23          // Disclaimer: Cypress makes no warranty of any kind, express or implied, with regard to
+  24          // this material, including, but not limited to, the implied warranties of merchantability and
+  25          // fitness for a particular purpose. Cypress reserves the right to make changes without
+  26          // further notice to the materials described herein. Cypress does not assume any liability
+  27          // arising out of the application or use of any product or circuit described herein. Cypress’
+  28          // products described herein are not authorized for use as components in life-support
+  29          // devices.
+  30          //
+  31          // This software is protected by and subject to worldwide patent coverage, including U.S.
+  32          // and foreign patents. Use may be limited by and subject to the Cypress Software License
+  33          // Agreement.
+  34          //-----------------------------------------------------------------------------
+  35          #pragma NOIV               // Do not generate interrupt vectors
+  36          
+  37          #include "fx2.h"
+  38          #include "fx2regs.h"
+  39          
+  40          extern BOOL   GotSUD;         // Received setup data flag
+  41          extern BOOL   Sleep;
+  42          extern BOOL   Rwuen;
+  43          extern BOOL   Selfpwr;
+  44          
+  45          WORD    pHIDDscr;
+  46          WORD    pReportDscr;
+  47          WORD    pReportDscrEnd;
+  48          extern code HIDDscr;
+  49          extern code HIDReportDscr; 
+  50          extern code HIDReportDscrEnd;
+  51          
+  52          BYTE xdata buttons;
+  53          BYTE xdata oldbuttons;
+  54          BYTE xdata leds;
+  55          
+C51 COMPILER V7.06   PERIPH                                                                06/13/2012 13:36:48 PAGE 2   
+
+  56          BYTE   Configuration;      // Current configuration
+  57          BYTE   AlternateSetting;   // Alternate settings
+  58          
+  59          #define BTN_ADDR                0x20
+  60          #define LED_ADDR                0x21
+  61          
+  62          //-----------------------------------------------------------------------------
+  63          // Task Dispatcher hooks
+  64          //   The following hooks are called by the task dispatcher.
+  65          //-----------------------------------------------------------------------------
+  66          
+  67          void TD_Init(void)             // Called once at startup
+  68          {
+  69   1         leds = 0xFF;
+  70   1         oldbuttons = 0xFF;
+  71   1      
+  72   1         EP1OUTCFG = 0xB0;       // valid, interrupt
+  73   1         EP1INCFG = 0XB0;        // valid, interrupt
+  74   1      
+  75   1         EP2CFG = EP4CFG = EP6CFG = EP8CFG = 0;   // disable unused endpoints
+  76   1      
+  77   1              EZUSB_InitI2C();                        // Initialize EZ-USB I2C controller
+  78   1      
+  79   1      
+  80   1      }
+  81          
+  82          void TD_Poll(void)             // Called repeatedly while the device is idle
+  83          {
+  84   1         if( !(EP1INCS & bmEPBUSY) )  // Is the IN1BUF available,
+  85   1         {
+  86   2            EZUSB_ReadI2C(BTN_ADDR,0x01,&buttons);    // Read button states
+  87   2            buttons &= 0x0F;
+  88   2            if ((oldbuttons - buttons) != 0)  //Change in button state
+  89   2            {
+  90   3               if (buttons & 1)       //Shift
+  91   3                  EP1INBUF[0] = 0;
+  92   3               else
+  93   3                  EP1INBUF[0] = 2;
+  94   3      
+  95   3               if (buttons & 2)       //a
+  96   3                  EP1INBUF[2] = 0;
+  97   3               else
+  98   3                  EP1INBUF[2] = 4;
+  99   3      
+ 100   3               if (buttons & 4)       //b
+ 101   3                  EP1INBUF[3] = 0;
+ 102   3               else
+ 103   3                  EP1INBUF[3] = 5;
+ 104   3      
+ 105   3               if (buttons & 8)       //c
+ 106   3                  EP1INBUF[4] = 0;
+ 107   3               else
+ 108   3                  EP1INBUF[4] = 6;
+ 109   3      
+ 110   3                              EP1INBUF[1] = 0;
+ 111   3                              EP1INBC = 5;
+ 112   3            }
+ 113   2            oldbuttons = buttons;
+ 114   2         }
+ 115   1      
+ 116   1              if( !(EP1OUTCS & bmEPBUSY) )    // Is there something available
+ 117   1              {
+C51 COMPILER V7.06   PERIPH                                                                06/13/2012 13:36:48 PAGE 3   
+
+ 118   2                      leds = 0xFF;                    //Turn all off
+ 119   2      
+ 120   2                      if (EP1OUTBUF[0] & 0x02)        //Caps
+ 121   2                              leds &= 0xBF;
+ 122   2                      if (EP1OUTBUF[0] & 0x01)        //Scroll
+ 123   2                              leds &= 0xF7;
+ 124   2                      if (EP1OUTBUF[0] & 0x04)        //Num
+ 125   2                              leds &= 0xFE;
+ 126   2      
+ 127   2            EZUSB_WriteI2C(LED_ADDR, 0x01, &leds);
+ 128   2            EZUSB_WaitForEEPROMWrite(LED_ADDR);
+ 129   2      
+ 130   2                      EP1OUTBC = 0;                           //Rearm endpoint buffer
+ 131   2              }
+ 132   1      }
+ 133          
+ 134          
+ 135          BOOL TD_Suspend(void)          // Called before the device goes into suspend mode
+ 136          {
+ 137   1         return(TRUE);
+ 138   1      }
+ 139          
+ 140          BOOL TD_Resume(void)          // Called after the device resumes
+ 141          {
+ 142   1         return(TRUE);
+ 143   1      }
+ 144          
+ 145          //-----------------------------------------------------------------------------
+ 146          // Device Request hooks
+ 147          //   The following hooks are called by the end point 0 device request parser.
+ 148          //-----------------------------------------------------------------------------
+ 149          
+ 150          BOOL DR_GetDescriptor(void)
+ 151          {
+ 152   1              BYTE length,i;
+ 153   1      
+ 154   1              pHIDDscr = (WORD)&HIDDscr;
+ 155   1              pReportDscr = (WORD)&HIDReportDscr;
+ 156   1              pReportDscrEnd = (WORD)&HIDReportDscrEnd;
+ 157   1      
+ 158   1              switch (SETUPDAT[3])
+ 159   1              {
+ 160   2                      case GD_HID:                                    //HID Descriptor
+ 161   2                              SUDPTRH = MSB(pHIDDscr);
+ 162   2                              SUDPTRL = LSB(pHIDDscr);
+ 163   2                              return (FALSE);
+ 164   2                      case GD_REPORT:                                 //Report Descriptor
+ 165   2                              length = pReportDscrEnd - pReportDscr;
+ 166   2      
+ 167   2               AUTOPTR1H = MSB(pReportDscr);
+ 168   2               AUTOPTR1L = LSB(pReportDscr);
+ 169   2      
+ 170   2               for(i=0;i<length;i++)
+ 171   2                  EP0BUF[i]=XAUTODAT1;
+ 172   2      
+ 173   2               EP0BCL = length;
+ 174   2               return (FALSE);
+ 175   2                      default:
+ 176   2                              return(TRUE);
+ 177   2              }
+ 178   1      }
+ 179          
+C51 COMPILER V7.06   PERIPH                                                                06/13/2012 13:36:48 PAGE 4   
+
+ 180          BOOL DR_SetConfiguration(void)   // Called when a Set Configuration command is received
+ 181          {
+ 182   1         Configuration = SETUPDAT[2];
+ 183   1         return(TRUE);            // Handled by user code
+ 184   1      }
+ 185          
+ 186          BOOL DR_GetConfiguration(void)   // Called when a Get Configuration command is received
+ 187          {
+ 188   1         EP0BUF[0] = Configuration;
+ 189   1         EP0BCH = 0;
+ 190   1         EP0BCL = 1;
+ 191   1         return(TRUE);            // Handled by user code
+ 192   1      }
+ 193          
+ 194          BOOL DR_SetInterface(void)       // Called when a Set Interface command is received
+ 195          {
+ 196   1         AlternateSetting = SETUPDAT[2];
+ 197   1         return(TRUE);            // Handled by user code
+ 198   1      }
+ 199          
+ 200          BOOL DR_GetInterface(void)       // Called when a Set Interface command is received
+ 201          {
+ 202   1         EP0BUF[0] = AlternateSetting;
+ 203   1         EP0BCH = 0;
+ 204   1         EP0BCL = 1;
+ 205   1         return(TRUE);            // Handled by user code
+ 206   1      }
+ 207          
+ 208          BOOL DR_GetStatus(void)
+ 209          {
+ 210   1         return(TRUE);
+ 211   1      }
+ 212          
+ 213          BOOL DR_ClearFeature(void)
+ 214          {
+ 215   1         return(TRUE);
+ 216   1      }
+ 217          
+ 218          BOOL DR_SetFeature(void)
+ 219          {
+ 220   1         return(TRUE);
+ 221   1      }
+ 222          
+ 223          BOOL DR_VendorCmnd(void)
+ 224          {
+ 225   1         return(TRUE);
+ 226   1      }
+ 227          
+ 228          //-----------------------------------------------------------------------------
+ 229          // USB Interrupt Handlers
+ 230          //   The following functions are called by the USB interrupt jump table.
+ 231          //-----------------------------------------------------------------------------
+ 232          
+ 233          // Setup Data Available Interrupt Handler
+ 234          void ISR_Sudav(void) interrupt 0
+ 235          {
+ 236   1         GotSUD = TRUE;            // Set flag
+ 237   1         EZUSB_IRQ_CLEAR();
+ 238   1         USBIRQ = bmSUDAV;         // Clear SUDAV IRQ
+ 239   1      }
+ 240          
+ 241          // Setup Token Interrupt Handler
+C51 COMPILER V7.06   PERIPH                                                                06/13/2012 13:36:48 PAGE 5   
+
+ 242          void ISR_Sutok(void) interrupt 0
+ 243          {
+ 244   1         EZUSB_IRQ_CLEAR();
+ 245   1         USBIRQ = bmSUTOK;         // Clear SUTOK IRQ
+ 246   1      }
+ 247          
+ 248          void ISR_Sof(void) interrupt 0
+ 249          {
+ 250   1         EZUSB_IRQ_CLEAR();
+ 251   1         USBIRQ = bmSOF;            // Clear SOF IRQ
+ 252   1      }
+ 253          
+ 254          void ISR_Ures(void) interrupt 0
+ 255          {
+ 256   1         // whenever we get a USB reset, we should revert to full speed mode
+ 257   1         pConfigDscr = pFullSpeedConfigDscr;
+ 258   1         ((CONFIGDSCR xdata *) pConfigDscr)->type = CONFIG_DSCR;
+ 259   1         pOtherConfigDscr = pHighSpeedConfigDscr;
+ 260   1         ((CONFIGDSCR xdata *) pOtherConfigDscr)->type = OTHERSPEED_DSCR;
+ 261   1         
+ 262   1         EZUSB_IRQ_CLEAR();
+ 263   1         USBIRQ = bmURES;         // Clear URES IRQ
+ 264   1      }
+ 265          
+ 266          void ISR_Susp(void) interrupt 0
+ 267          {
+ 268   1         Sleep = TRUE;
+ 269   1         EZUSB_IRQ_CLEAR();
+ 270   1         USBIRQ = bmSUSP;
+ 271   1      }
+ 272          
+ 273          void ISR_Highspeed(void) interrupt 0
+ 274          {
+ 275   1         if (EZUSB_HIGHSPEED())
+ 276   1         {
+ 277   2            pConfigDscr = pHighSpeedConfigDscr;
+ 278   2            ((CONFIGDSCR xdata *) pConfigDscr)->type = CONFIG_DSCR;
+ 279   2            pOtherConfigDscr = pFullSpeedConfigDscr;
+ 280   2            ((CONFIGDSCR xdata *) pOtherConfigDscr)->type = OTHERSPEED_DSCR;
+ 281   2         }
+ 282   1      
+ 283   1         EZUSB_IRQ_CLEAR();
+ 284   1         USBIRQ = bmHSGRANT;
+ 285   1      }
+ 286          void ISR_Ep0ack(void) interrupt 0
+ 287          {
+ 288   1      }
+ 289          void ISR_Stub(void) interrupt 0
+ 290          {
+ 291   1      }
+ 292          void ISR_Ep0in(void) interrupt 0
+ 293          {
+ 294   1      }
+ 295          void ISR_Ep0out(void) interrupt 0
+ 296          {
+ 297   1      }
+ 298          void ISR_Ep1in(void) interrupt 0
+ 299          {
+ 300   1      }
+ 301          void ISR_Ep1out(void) interrupt 0
+ 302          {
+ 303   1      }
+C51 COMPILER V7.06   PERIPH                                                                06/13/2012 13:36:48 PAGE 6   
+
+ 304          void ISR_Ep2inout(void) interrupt 0
+ 305          {
+ 306   1      }
+ 307          void ISR_Ep4inout(void) interrupt 0
+ 308          {
+ 309   1      }
+ 310          void ISR_Ep6inout(void) interrupt 0
+ 311          {
+ 312   1      }
+ 313          void ISR_Ep8inout(void) interrupt 0
+ 314          {
+ 315   1      }
+ 316          void ISR_Ibn(void) interrupt 0
+ 317          {
+ 318   1      }
+ 319          void ISR_Ep0pingnak(void) interrupt 0
+ 320          {
+ 321   1      }
+ 322          void ISR_Ep1pingnak(void) interrupt 0
+ 323          {
+ 324   1      }
+ 325          void ISR_Ep2pingnak(void) interrupt 0
+ 326          {
+ 327   1      }
+ 328          void ISR_Ep4pingnak(void) interrupt 0
+ 329          {
+ 330   1      }
+ 331          void ISR_Ep6pingnak(void) interrupt 0
+ 332          {
+ 333   1      }
+ 334          void ISR_Ep8pingnak(void) interrupt 0
+ 335          {
+ 336   1      }
+ 337          void ISR_Errorlimit(void) interrupt 0
+ 338          {
+ 339   1      }
+ 340          void ISR_Ep2piderror(void) interrupt 0
+ 341          {
+ 342   1      }
+ 343          void ISR_Ep4piderror(void) interrupt 0
+ 344          {
+ 345   1      }
+ 346          void ISR_Ep6piderror(void) interrupt 0
+ 347          {
+ 348   1      }
+ 349          void ISR_Ep8piderror(void) interrupt 0
+ 350          {
+ 351   1      }
+ 352          void ISR_Ep2pflag(void) interrupt 0
+ 353          {
+ 354   1      }
+ 355          void ISR_Ep4pflag(void) interrupt 0
+ 356          {
+ 357   1      }
+ 358          void ISR_Ep6pflag(void) interrupt 0
+ 359          {
+ 360   1      }
+ 361          void ISR_Ep8pflag(void) interrupt 0
+ 362          {
+ 363   1      }
+ 364          void ISR_Ep2eflag(void) interrupt 0
+ 365          {
+C51 COMPILER V7.06   PERIPH                                                                06/13/2012 13:36:48 PAGE 7   
+
+ 366   1      }
+ 367          void ISR_Ep4eflag(void) interrupt 0
+ 368          {
+ 369   1      }
+ 370          void ISR_Ep6eflag(void) interrupt 0
+ 371          {
+ 372   1      }
+ 373          void ISR_Ep8eflag(void) interrupt 0
+ 374          {
+ 375   1      }
+ 376          void ISR_Ep2fflag(void) interrupt 0
+ 377          {
+ 378   1      }
+ 379          void ISR_Ep4fflag(void) interrupt 0
+ 380          {
+ 381   1      }
+ 382          void ISR_Ep6fflag(void) interrupt 0
+ 383          {
+ 384   1      }
+ 385          void ISR_Ep8fflag(void) interrupt 0
+ 386          {
+ 387   1      }
+ 388          void ISR_GpifComplete(void) interrupt 0
+ 389          {
+ 390   1      }
+ 391          void ISR_GpifWaveform(void) interrupt 0
+ 392          {
+ 393   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    641    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      3    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      8    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,1427 @@
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 1   
+
+
+C51 COMPILER V7.06, COMPILATION OF MODULE MEMTEST
+OBJECT MODULE PLACED IN MEMTEST.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE MEMTEST.C OPTIMIZE(6,SPEED) DEBUG OBJECTEXTEND CODE
+
+stmt level    source
+
+   1          // RAM test - avoids the range from 0x4000 to 0x5100 since it is loaded there
+   2          #define ALLOCATE_EXTERN // Allocate explicit register addresses here
+   3          #include "Fx2.h"
+   4          #include "Fx2regs.h"
+   5          
+   6          #define START_MEM00             0x0C00
+   7          #define LENGTH_MEM00    (0x2000-START_MEM00)
+   8          #define START_MEM01             0x2000
+   9          #define LENGTH_MEM01    0x2000 // avoids the range from 0x4000 to 0x5100
+  10                                                                     // this program code is loaded at 0x4000-0x5000
+  11                                                                     // and XDATA is located at 0x5000-0x5100
+  12          #define START_MEM02             0x5100 // check 0x5100 to 0x8000
+  13          #define LENGTH_MEM02    (0x8000-START_MEM02)
+  14          
+  15          #define START_MEM03             0xE000
+  16          #define LENGTH_MEM03    0x200  // scratch RAM
+  17          
+  18          #define START_MEM04       0xE400  // check GPIF waveform buffer
+  19          #define LENGTH_MEM04  0x007F  // and stop at 384 byte(s) reserved
+  20          
+  21          #define START_MEM05   0xE740  // check endpoint 0 & 1 buffer(s)
+  22          #define LENGTH_MEM05  0x00BF  // and stop at 2k Reserved & 2,4,6,8 buffer(s)
+  23                                        
+  24          #define START_MEM06   0xF000  // check EP2
+  25          #define LENGTH_MEM06  0x0200  
+  26          
+  27          #define START_MEM07   0xF400  // check EP4
+  28          #define LENGTH_MEM07  0x0200  
+  29          
+  30          #define START_MEM08   0xF800  // check EP6
+  31          #define LENGTH_MEM08  0x0200  
+  32          
+  33          #define START_MEM09   0xFC00  // check EP8
+  34          #define LENGTH_MEM09  0x0200  
+  35          
+  36          #define LED_ADDR                0x21
+  37          
+  38          BYTE xdata Digit[] = { 0xc0, 0xf9, 0xa4, 0xb0, 0x99, 0x92, 0x82, 0xf8, 0x80, 0x98, 0x88, 0x83, 0xc6, 0xa1,
+             - 0x86, 0x8e };
+  39          BYTE xdata Alpha[] = { 0x88,0x83,0xa7,0xa1,0x86,0x8e,0x90,0x8b,0xef,0xe1,0x87,0xc7,0x80,0xab,0xa3,0x8c,0x4
+             -0,0xaf,0x92,0x87,0xc1,0xcd,0x80,0x89,0x99,0xa4 };
+  40          BYTE xdata blank = 0xff;
+  41          
+  42          BYTE err_lvl;
+  43          
+  44          extern BOOL test_data(void);
+  45          
+  46          long test_mem(BYTE xdata *addr, WORD length)
+  47          {
+  48   1              WORD i;
+  49   1              BYTE data1;
+  50   1              BYTE data2;
+  51   1      
+  52   1        err_lvl = 1;
+  53   1      
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 2   
+
+  54   1              for(i = 0; i < length; ++i)
+  55   1                      addr[i] = 0x00;
+  56   1              for(i = 0; i < length; ++i)
+  57   1                      if(addr[i] != 0x00)
+  58   1                              return(addr+i);
+  59   1      
+  60   1        err_lvl = 2;
+  61   1      
+  62   1              for(i = 0; i < length; ++i)
+  63   1                      addr[i] = 0xff;
+  64   1              for(i = 0; i < length; ++i)
+  65   1                      if(addr[i] != 0xff)
+  66   1                              return(addr+i);
+  67   1      
+  68   1        err_lvl = 3;
+  69   1      
+  70   1              for(i = 0; i < length; ++i)
+  71   1                      addr[i] = 0xaa;
+  72   1              for(i = 0; i < length; ++i)
+  73   1                      if(addr[i] != 0xaa)
+  74   1                              return(addr+i);
+  75   1      
+  76   1        err_lvl = 4;
+  77   1      
+  78   1              for(i = 0; i < length; ++i)
+  79   1                      addr[i] = 0x55;
+  80   1              for(i = 0; i < length; ++i)
+  81   1                      if(addr[i] != 0x55)
+  82   1                              return(addr+i);
+  83   1      
+  84   1        err_lvl = 5;
+  85   1      
+  86   1              for(i = length-1; i > 0; --i) // Check the address bus -- LSB only
+  87   1                      addr[i] = LSB(i) + MSB(i) * 3;
+  88   1              for(i = length-1; i > 0; --i)
+  89   1                      if(addr[i] != (BYTE) (LSB(i) + MSB(i) * 3)) 
+  90   1                              return(addr+i);
+  91   1      
+  92   1        err_lvl = 6;
+  93   1      
+  94   1        for(i = 0; i < length; ++i)
+  95   1                      addr[i] = LSB(i) + MSB(i) * 3;
+  96   1              for(i = 0; i < length; ++i)
+  97   1                      if(addr[i] != (BYTE) (LSB(i) + MSB(i) * 3))
+  98   1                              return(addr+i);
+  99   1      
+ 100   1        err_lvl = 7;
+ 101   1      
+ 102   1              if( ((addr+length) <= 0x2000) ||((addr+length) >= 0xF000) )  // internal data access only via AUTODAT1
+ 103   1              {
+ 104   2                      for(i = 0; i < length; ++i)
+ 105   2                              addr[i] = 0x00;
+ 106   2                      APTR1H = MSB(addr);
+ 107   2                      APTR1L = LSB(addr);
+ 108   2                      for(i = 0; i < length; ++i)
+ 109   2                      {
+ 110   3                              data1 = LSB(i) + MSB(i) * 3;
+ 111   3                              EXTAUTODAT1 = data1;
+ 112   3                      }
+ 113   2      
+ 114   2                      APTR1H = MSB(addr);
+ 115   2                      APTR1L = LSB(addr);
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 3   
+
+ 116   2                      for(i = 0; i < length; ++i)
+ 117   2                      {
+ 118   3                              data2 = EXTAUTODAT1;
+ 119   3                              if(data2 != (BYTE) (LSB(i) + MSB(i) * 3))
+ 120   3                                      return(addr+i);
+ 121   3                      }
+ 122   2              }
+ 123   1      
+ 124   1              return(-1);
+ 125   1      }
+ 126          
+ 127          void status(WORD stat)
+ 128          {
+ 129   1              WORD saveStat = stat;
+ 130   1              BYTE i;
+ 131   1      
+ 132   1              while(TRUE)
+ 133   1              {
+ 134   2                      stat=saveStat;
+ 135   2                      for (i = 0; i < 4; i++, stat <<= 4)
+ 136   2                      {
+ 137   3                              EZUSB_WriteI2C(LED_ADDR, 0x01, &(Digit[(stat>>12)&0xf]));
+ 138   3                              EZUSB_WaitForEEPROMWrite(LED_ADDR);
+ 139   3                              EZUSB_Delay(400);
+ 140   3                              EZUSB_WriteI2C(LED_ADDR, 0x01, &blank);
+ 141   3                              EZUSB_WaitForEEPROMWrite(LED_ADDR);
+ 142   3                              EZUSB_Delay(200);
+ 143   3                      }
+ 144   2                      EZUSB_WriteI2C(LED_ADDR, 0x01, &blank);
+ 145   2                      EZUSB_WaitForEEPROMWrite(LED_ADDR);
+ 146   2                      EZUSB_Delay(500);
+ 147   2              }
+ 148   1      }
+ 149          
+ 150          void statString(char *stat)
+ 151          {
+ 152   1              BYTE i;
+ 153   1      
+ 154   1                      for (i = 0; stat[i]; i++)
+ 155   1                      {
+ 156   2                              EZUSB_WriteI2C(LED_ADDR, 0x01, &(Alpha[(stat[i] & 0x5f)-'A']));
+ 157   2                              EZUSB_WaitForEEPROMWrite(LED_ADDR);
+ 158   2                              EZUSB_Delay(400);
+ 159   2                              EZUSB_WriteI2C(LED_ADDR, 0x01, &blank);
+ 160   2                              EZUSB_WaitForEEPROMWrite(LED_ADDR);
+ 161   2                              EZUSB_Delay(200);
+ 162   2                      }
+ 163   1                      EZUSB_WriteI2C(LED_ADDR, 0x01, &blank);
+ 164   1                      EZUSB_WaitForEEPROMWrite(LED_ADDR);
+ 165   1                      EZUSB_Delay(500);
+ 166   1      }
+ 167          
+ 168          main()
+ 169          {
+ 170   1              long addr;
+ 171   1              BYTE xdata      buttons = 0;
+ 172   1              BYTE xdata      cont_loop = 1;
+ 173   1      
+ 174   1      
+ 175   1              EZUSB_InitI2C();
+ 176   1        CPUCS = 0x10;         // set 48Mhz bit 
+ 177   1        IFCONFIG = 0xF6;        // GPIF Int clock 48Mhz GSTATE SYNC  1111 0110
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 4   
+
+ 178   1          
+ 179   1        // enable dual autopointer feature
+ 180   1        AUTOPTRSETUP |= 0x01;
+ 181   1      
+ 182   1              EZUSB_WriteI2C(LED_ADDR, 0x01, &(Digit[0]));
+ 183   1              EZUSB_WaitForEEPROMWrite(LED_ADDR);
+ 184   1      
+ 185   1              while(cont_loop)
+ 186   1              {
+ 187   2        
+ 188   2                      addr = test_mem(START_MEM00,LENGTH_MEM00);
+ 189   2                      if (addr != -1)
+ 190   2                  status(addr);
+ 191   2      
+ 192   2                      // test to see if this is an FX2 or an FX2LP.  Do this by writing to the
+ 193   2                      // ECCCFG register which only exists in FX2LP
+ 194   2                      ECCCFG = 0x01;
+ 195   2                      if (ECCCFG == 0x01)
+ 196   2                      {
+ 197   3                              addr = test_mem(START_MEM01,LENGTH_MEM01);
+ 198   3                              if (addr != -1)
+ 199   3                          status(addr);
+ 200   3                      }
+ 201   2      
+ 202   2      //              addr = test_mem(START_MEM02,LENGTH_MEM02);
+ 203   2      //              if (addr != -1)
+ 204   2      //            status(addr);
+ 205   2      
+ 206   2                      addr = test_mem(START_MEM03,LENGTH_MEM03);
+ 207   2                      if (addr != -1)
+ 208   2                  status(addr);
+ 209   2      
+ 210   2                      addr = test_mem(START_MEM06,LENGTH_MEM06);
+ 211   2                      if (addr != -1)
+ 212   2                  status(addr);
+ 213   2      
+ 214   2                      addr = test_mem(START_MEM07,LENGTH_MEM07);
+ 215   2                      if (addr != -1)
+ 216   2                  status(addr);
+ 217   2      
+ 218   2                      addr = test_mem(START_MEM08,LENGTH_MEM08);
+ 219   2                      if (addr != -1)
+ 220   2                  status(addr);
+ 221   2      
+ 222   2                      addr = test_mem(START_MEM09,LENGTH_MEM09);
+ 223   2                      if (addr != -1)
+ 224   2                  status(addr);
+ 225   2      
+ 226   2                      IFCONFIG = 0x02;
+ 227   2      
+ 228   2                      addr = test_mem(START_MEM04,LENGTH_MEM04); // Do WF Mem test
+ 229   2                      if (addr != -1)
+ 230   2                  status(addr);
+ 231   2      
+ 232   2                      addr = test_mem(START_MEM05,LENGTH_MEM05);
+ 233   2                      if (addr != -1)
+ 234   2                  status(addr);
+ 235   2      
+ 236   2      //              xd = (BYTE xdata *)START_MEM00;
+ 237   2      //              cd = (BYTE code *)START_MEM01;
+ 238   2      
+ 239   2      //              *xd = *cd + 1;
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 5   
+
+ 240   2      
+ 241   2      //              if(*xd != *cd)
+ 242   2                      {
+ 243   3                  statString("good");
+ 244   3                      }
+ 245   2              }
+ 246   1      
+ 247   1              statString("dog");                                      // Never happen
+ 248   1              EZUSB_ReadI2C(0x20,0x01,&buttons);      // Read button states
+ 249   1      
+ 250   1      }
+ 251          
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 6   
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+
+             ; FUNCTION _test_mem (BEGIN)
+                                           ; SOURCE LINE # 46
+0000 8C00        R     MOV     length,R4
+0002 8D00        R     MOV     length+01H,R5
+;---- Variable 'addr' assigned to Register 'R2/R3' ----
+0004 AB07              MOV     R3,AR7
+0006 AA06              MOV     R2,AR6
+                                           ; SOURCE LINE # 47
+                                           ; SOURCE LINE # 52
+0008 750001      R     MOV     err_lvl,#01H
+                                           ; SOURCE LINE # 54
+000B E4                CLR     A
+000C F500        R     MOV     i,A
+000E F500        R     MOV     i+01H,A
+0010         ?C0001:
+0010 C3                CLR     C
+0011 E500        R     MOV     A,i+01H
+0013 9500        R     SUBB    A,length+01H
+0015 E500        R     MOV     A,i
+0017 9500        R     SUBB    A,length
+0019 5016              JNC     ?C0002
+                                           ; SOURCE LINE # 55
+001B EB                MOV     A,R3
+001C 2500        R     ADD     A,i+01H
+001E F582              MOV     DPL,A
+0020 EA                MOV     A,R2
+0021 3500        R     ADDC    A,i
+0023 F583              MOV     DPH,A
+0025 E4                CLR     A
+0026 F0                MOVX    @DPTR,A
+0027 0500        R     INC     i+01H
+0029 E500        R     MOV     A,i+01H
+002B 7002              JNZ     ?C0079
+002D 0500        R     INC     i
+002F         ?C0079:
+002F 80DF              SJMP    ?C0001
+0031         ?C0002:
+                                           ; SOURCE LINE # 56
+0031 E4                CLR     A
+0032 F500        R     MOV     i,A
+0034 F500        R     MOV     i+01H,A
+0036         ?C0004:
+0036 C3                CLR     C
+0037 E500        R     MOV     A,i+01H
+0039 9500        R     SUBB    A,length+01H
+003B E500        R     MOV     A,i
+003D 9500        R     SUBB    A,length
+003F 5023              JNC     ?C0005
+                                           ; SOURCE LINE # 57
+0041 EB                MOV     A,R3
+0042 2500        R     ADD     A,i+01H
+0044 F582              MOV     DPL,A
+0046 EA                MOV     A,R2
+0047 3500        R     ADDC    A,i
+0049 F583              MOV     DPH,A
+004B E0                MOVX    A,@DPTR
+004C 600C              JZ      ?C0006
+                                           ; SOURCE LINE # 58
+004E EB                MOV     A,R3
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 7   
+
+004F 2500        R     ADD     A,i+01H
+0051 FF                MOV     R7,A
+0052 EA                MOV     A,R2
+0053 3500        R     ADDC    A,i
+0055 FE                MOV     R6,A
+0056 E4                CLR     A
+0057 FC                MOV     R4,A
+0058 FD                MOV     R5,A
+0059 22                RET     
+005A         ?C0006:
+005A 0500        R     INC     i+01H
+005C E500        R     MOV     A,i+01H
+005E 7002              JNZ     ?C0080
+0060 0500        R     INC     i
+0062         ?C0080:
+0062 80D2              SJMP    ?C0004
+0064         ?C0005:
+                                           ; SOURCE LINE # 60
+0064 750002      R     MOV     err_lvl,#02H
+                                           ; SOURCE LINE # 62
+0067 E4                CLR     A
+0068 F500        R     MOV     i,A
+006A F500        R     MOV     i+01H,A
+006C         ?C0009:
+006C C3                CLR     C
+006D E500        R     MOV     A,i+01H
+006F 9500        R     SUBB    A,length+01H
+0071 E500        R     MOV     A,i
+0073 9500        R     SUBB    A,length
+0075 5017              JNC     ?C0010
+                                           ; SOURCE LINE # 63
+0077 EB                MOV     A,R3
+0078 2500        R     ADD     A,i+01H
+007A F582              MOV     DPL,A
+007C EA                MOV     A,R2
+007D 3500        R     ADDC    A,i
+007F F583              MOV     DPH,A
+0081 74FF              MOV     A,#0FFH
+0083 F0                MOVX    @DPTR,A
+0084 0500        R     INC     i+01H
+0086 E500        R     MOV     A,i+01H
+0088 7002              JNZ     ?C0081
+008A 0500        R     INC     i
+008C         ?C0081:
+008C 80DE              SJMP    ?C0009
+008E         ?C0010:
+                                           ; SOURCE LINE # 64
+008E E4                CLR     A
+008F F500        R     MOV     i,A
+0091 F500        R     MOV     i+01H,A
+0093         ?C0012:
+0093 C3                CLR     C
+0094 E500        R     MOV     A,i+01H
+0096 9500        R     SUBB    A,length+01H
+0098 E500        R     MOV     A,i
+009A 9500        R     SUBB    A,length
+009C 5024              JNC     ?C0013
+                                           ; SOURCE LINE # 65
+009E EB                MOV     A,R3
+009F 2500        R     ADD     A,i+01H
+00A1 F582              MOV     DPL,A
+00A3 EA                MOV     A,R2
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 8   
+
+00A4 3500        R     ADDC    A,i
+00A6 F583              MOV     DPH,A
+00A8 E0                MOVX    A,@DPTR
+00A9 F4                CPL     A
+00AA 600C              JZ      ?C0014
+                                           ; SOURCE LINE # 66
+00AC EB                MOV     A,R3
+00AD 2500        R     ADD     A,i+01H
+00AF FF                MOV     R7,A
+00B0 EA                MOV     A,R2
+00B1 3500        R     ADDC    A,i
+00B3 FE                MOV     R6,A
+00B4 E4                CLR     A
+00B5 FC                MOV     R4,A
+00B6 FD                MOV     R5,A
+00B7 22                RET     
+00B8         ?C0014:
+00B8 0500        R     INC     i+01H
+00BA E500        R     MOV     A,i+01H
+00BC 7002              JNZ     ?C0082
+00BE 0500        R     INC     i
+00C0         ?C0082:
+00C0 80D1              SJMP    ?C0012
+00C2         ?C0013:
+                                           ; SOURCE LINE # 68
+00C2 750003      R     MOV     err_lvl,#03H
+                                           ; SOURCE LINE # 70
+00C5 E4                CLR     A
+00C6 F500        R     MOV     i,A
+00C8 F500        R     MOV     i+01H,A
+00CA         ?C0016:
+00CA C3                CLR     C
+00CB E500        R     MOV     A,i+01H
+00CD 9500        R     SUBB    A,length+01H
+00CF E500        R     MOV     A,i
+00D1 9500        R     SUBB    A,length
+00D3 5017              JNC     ?C0017
+                                           ; SOURCE LINE # 71
+00D5 EB                MOV     A,R3
+00D6 2500        R     ADD     A,i+01H
+00D8 F582              MOV     DPL,A
+00DA EA                MOV     A,R2
+00DB 3500        R     ADDC    A,i
+00DD F583              MOV     DPH,A
+00DF 74AA              MOV     A,#0AAH
+00E1 F0                MOVX    @DPTR,A
+00E2 0500        R     INC     i+01H
+00E4 E500        R     MOV     A,i+01H
+00E6 7002              JNZ     ?C0083
+00E8 0500        R     INC     i
+00EA         ?C0083:
+00EA 80DE              SJMP    ?C0016
+00EC         ?C0017:
+                                           ; SOURCE LINE # 72
+00EC E4                CLR     A
+00ED F500        R     MOV     i,A
+00EF F500        R     MOV     i+01H,A
+00F1         ?C0019:
+00F1 C3                CLR     C
+00F2 E500        R     MOV     A,i+01H
+00F4 9500        R     SUBB    A,length+01H
+00F6 E500        R     MOV     A,i
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 9   
+
+00F8 9500        R     SUBB    A,length
+00FA 5025              JNC     ?C0020
+                                           ; SOURCE LINE # 73
+00FC EB                MOV     A,R3
+00FD 2500        R     ADD     A,i+01H
+00FF F582              MOV     DPL,A
+0101 EA                MOV     A,R2
+0102 3500        R     ADDC    A,i
+0104 F583              MOV     DPH,A
+0106 E0                MOVX    A,@DPTR
+0107 64AA              XRL     A,#0AAH
+0109 600C              JZ      ?C0021
+                                           ; SOURCE LINE # 74
+010B EB                MOV     A,R3
+010C 2500        R     ADD     A,i+01H
+010E FF                MOV     R7,A
+010F EA                MOV     A,R2
+0110 3500        R     ADDC    A,i
+0112 FE                MOV     R6,A
+0113 E4                CLR     A
+0114 FC                MOV     R4,A
+0115 FD                MOV     R5,A
+0116 22                RET     
+0117         ?C0021:
+0117 0500        R     INC     i+01H
+0119 E500        R     MOV     A,i+01H
+011B 7002              JNZ     ?C0084
+011D 0500        R     INC     i
+011F         ?C0084:
+011F 80D0              SJMP    ?C0019
+0121         ?C0020:
+                                           ; SOURCE LINE # 76
+0121 750004      R     MOV     err_lvl,#04H
+                                           ; SOURCE LINE # 78
+0124 E4                CLR     A
+0125 F500        R     MOV     i,A
+0127 F500        R     MOV     i+01H,A
+0129         ?C0023:
+0129 C3                CLR     C
+012A E500        R     MOV     A,i+01H
+012C 9500        R     SUBB    A,length+01H
+012E E500        R     MOV     A,i
+0130 9500        R     SUBB    A,length
+0132 5017              JNC     ?C0024
+                                           ; SOURCE LINE # 79
+0134 EB                MOV     A,R3
+0135 2500        R     ADD     A,i+01H
+0137 F582              MOV     DPL,A
+0139 EA                MOV     A,R2
+013A 3500        R     ADDC    A,i
+013C F583              MOV     DPH,A
+013E 7455              MOV     A,#055H
+0140 F0                MOVX    @DPTR,A
+0141 0500        R     INC     i+01H
+0143 E500        R     MOV     A,i+01H
+0145 7002              JNZ     ?C0085
+0147 0500        R     INC     i
+0149         ?C0085:
+0149 80DE              SJMP    ?C0023
+014B         ?C0024:
+                                           ; SOURCE LINE # 80
+014B E4                CLR     A
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 10  
+
+014C F500        R     MOV     i,A
+014E F500        R     MOV     i+01H,A
+0150         ?C0026:
+0150 C3                CLR     C
+0151 E500        R     MOV     A,i+01H
+0153 9500        R     SUBB    A,length+01H
+0155 E500        R     MOV     A,i
+0157 9500        R     SUBB    A,length
+0159 5025              JNC     ?C0027
+                                           ; SOURCE LINE # 81
+015B EB                MOV     A,R3
+015C 2500        R     ADD     A,i+01H
+015E F582              MOV     DPL,A
+0160 EA                MOV     A,R2
+0161 3500        R     ADDC    A,i
+0163 F583              MOV     DPH,A
+0165 E0                MOVX    A,@DPTR
+0166 6455              XRL     A,#055H
+0168 600C              JZ      ?C0028
+                                           ; SOURCE LINE # 82
+016A EB                MOV     A,R3
+016B 2500        R     ADD     A,i+01H
+016D FF                MOV     R7,A
+016E EA                MOV     A,R2
+016F 3500        R     ADDC    A,i
+0171 FE                MOV     R6,A
+0172 E4                CLR     A
+0173 FC                MOV     R4,A
+0174 FD                MOV     R5,A
+0175 22                RET     
+0176         ?C0028:
+0176 0500        R     INC     i+01H
+0178 E500        R     MOV     A,i+01H
+017A 7002              JNZ     ?C0086
+017C 0500        R     INC     i
+017E         ?C0086:
+017E 80D0              SJMP    ?C0026
+0180         ?C0027:
+                                           ; SOURCE LINE # 84
+0180 750005      R     MOV     err_lvl,#05H
+                                           ; SOURCE LINE # 86
+0183 E500        R     MOV     A,length+01H
+0185 24FF              ADD     A,#0FFH
+0187 F500        R     MOV     i+01H,A
+0189 E500        R     MOV     A,length
+018B 34FF              ADDC    A,#0FFH
+018D F500        R     MOV     i,A
+018F         ?C0030:
+018F D3                SETB    C
+0190 E500        R     MOV     A,i+01H
+0192 9400              SUBB    A,#00H
+0194 E500        R     MOV     A,i
+0196 9400              SUBB    A,#00H
+0198 4021              JC      ?C0031
+                                           ; SOURCE LINE # 87
+019A E500        R     MOV     A,i
+019C 75F003            MOV     B,#03H
+019F A4                MUL     AB
+01A0 FF                MOV     R7,A
+01A1 E500        R     MOV     A,i+01H
+01A3 2F                ADD     A,R7
+01A4 FF                MOV     R7,A
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 11  
+
+01A5 EB                MOV     A,R3
+01A6 2500        R     ADD     A,i+01H
+01A8 F582              MOV     DPL,A
+01AA EA                MOV     A,R2
+01AB 3500        R     ADDC    A,i
+01AD F583              MOV     DPH,A
+01AF EF                MOV     A,R7
+01B0 F0                MOVX    @DPTR,A
+01B1 E500        R     MOV     A,i+01H
+01B3 1500        R     DEC     i+01H
+01B5 7002              JNZ     ?C0087
+01B7 1500        R     DEC     i
+01B9         ?C0087:
+01B9 80D4              SJMP    ?C0030
+01BB         ?C0031:
+                                           ; SOURCE LINE # 88
+01BB E500        R     MOV     A,length+01H
+01BD 24FF              ADD     A,#0FFH
+01BF F500        R     MOV     i+01H,A
+01C1 E500        R     MOV     A,length
+01C3 34FF              ADDC    A,#0FFH
+01C5 F500        R     MOV     i,A
+01C7         ?C0033:
+01C7 D3                SETB    C
+01C8 E500        R     MOV     A,i+01H
+01CA 9400              SUBB    A,#00H
+01CC E500        R     MOV     A,i
+01CE 9400              SUBB    A,#00H
+01D0 402F              JC      ?C0034
+                                           ; SOURCE LINE # 89
+01D2 E500        R     MOV     A,i
+01D4 75F003            MOV     B,#03H
+01D7 A4                MUL     AB
+01D8 FF                MOV     R7,A
+01D9 E500        R     MOV     A,i+01H
+01DB 2F                ADD     A,R7
+01DC FF                MOV     R7,A
+01DD EB                MOV     A,R3
+01DE 2500        R     ADD     A,i+01H
+01E0 F582              MOV     DPL,A
+01E2 EA                MOV     A,R2
+01E3 3500        R     ADDC    A,i
+01E5 F583              MOV     DPH,A
+01E7 E0                MOVX    A,@DPTR
+01E8 6F                XRL     A,R7
+01E9 600C              JZ      ?C0035
+                                           ; SOURCE LINE # 90
+01EB EB                MOV     A,R3
+01EC 2500        R     ADD     A,i+01H
+01EE FF                MOV     R7,A
+01EF EA                MOV     A,R2
+01F0 3500        R     ADDC    A,i
+01F2 FE                MOV     R6,A
+01F3 E4                CLR     A
+01F4 FC                MOV     R4,A
+01F5 FD                MOV     R5,A
+01F6 22                RET     
+01F7         ?C0035:
+01F7 E500        R     MOV     A,i+01H
+01F9 1500        R     DEC     i+01H
+01FB 7002              JNZ     ?C0088
+01FD 1500        R     DEC     i
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 12  
+
+01FF         ?C0088:
+01FF 80C6              SJMP    ?C0033
+0201         ?C0034:
+                                           ; SOURCE LINE # 92
+0201 750006      R     MOV     err_lvl,#06H
+                                           ; SOURCE LINE # 94
+0204 E4                CLR     A
+0205 F500        R     MOV     i,A
+0207 F500        R     MOV     i+01H,A
+0209         ?C0037:
+0209 C3                CLR     C
+020A E500        R     MOV     A,i+01H
+020C 9500        R     SUBB    A,length+01H
+020E E500        R     MOV     A,i
+0210 9500        R     SUBB    A,length
+0212 5021              JNC     ?C0038
+                                           ; SOURCE LINE # 95
+0214 E500        R     MOV     A,i
+0216 75F003            MOV     B,#03H
+0219 A4                MUL     AB
+021A FF                MOV     R7,A
+021B E500        R     MOV     A,i+01H
+021D 2F                ADD     A,R7
+021E FF                MOV     R7,A
+021F EB                MOV     A,R3
+0220 2500        R     ADD     A,i+01H
+0222 F582              MOV     DPL,A
+0224 EA                MOV     A,R2
+0225 3500        R     ADDC    A,i
+0227 F583              MOV     DPH,A
+0229 EF                MOV     A,R7
+022A F0                MOVX    @DPTR,A
+022B 0500        R     INC     i+01H
+022D E500        R     MOV     A,i+01H
+022F 7002              JNZ     ?C0089
+0231 0500        R     INC     i
+0233         ?C0089:
+0233 80D4              SJMP    ?C0037
+0235         ?C0038:
+                                           ; SOURCE LINE # 96
+0235 E4                CLR     A
+0236 F500        R     MOV     i,A
+0238 F500        R     MOV     i+01H,A
+023A         ?C0040:
+023A C3                CLR     C
+023B E500        R     MOV     A,i+01H
+023D 9500        R     SUBB    A,length+01H
+023F E500        R     MOV     A,i
+0241 9500        R     SUBB    A,length
+0243 502F              JNC     ?C0041
+                                           ; SOURCE LINE # 97
+0245 E500        R     MOV     A,i
+0247 75F003            MOV     B,#03H
+024A A4                MUL     AB
+024B FF                MOV     R7,A
+024C E500        R     MOV     A,i+01H
+024E 2F                ADD     A,R7
+024F FF                MOV     R7,A
+0250 EB                MOV     A,R3
+0251 2500        R     ADD     A,i+01H
+0253 F582              MOV     DPL,A
+0255 EA                MOV     A,R2
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 13  
+
+0256 3500        R     ADDC    A,i
+0258 F583              MOV     DPH,A
+025A E0                MOVX    A,@DPTR
+025B 6F                XRL     A,R7
+025C 600C              JZ      ?C0042
+                                           ; SOURCE LINE # 98
+025E EB                MOV     A,R3
+025F 2500        R     ADD     A,i+01H
+0261 FF                MOV     R7,A
+0262 EA                MOV     A,R2
+0263 3500        R     ADDC    A,i
+0265 FE                MOV     R6,A
+0266 E4                CLR     A
+0267 FC                MOV     R4,A
+0268 FD                MOV     R5,A
+0269 22                RET     
+026A         ?C0042:
+026A 0500        R     INC     i+01H
+026C E500        R     MOV     A,i+01H
+026E 7002              JNZ     ?C0090
+0270 0500        R     INC     i
+0272         ?C0090:
+0272 80C6              SJMP    ?C0040
+0274         ?C0041:
+                                           ; SOURCE LINE # 100
+0274 750007      R     MOV     err_lvl,#07H
+                                           ; SOURCE LINE # 102
+0277 EB                MOV     A,R3
+0278 2500        R     ADD     A,length+01H
+027A FF                MOV     R7,A
+027B EA                MOV     A,R2
+027C 3500        R     ADDC    A,length
+027E FE                MOV     R6,A
+027F D3                SETB    C
+0280 EF                MOV     A,R7
+0281 9400              SUBB    A,#00H
+0283 EE                MOV     A,R6
+0284 9420              SUBB    A,#020H
+0286 4008              JC      ?C0045
+0288 EE                MOV     A,R6
+0289 94F0              SUBB    A,#0F0H
+028B 5003              JNC     $ + 5H
+028D 020000      R     LJMP    ?C0044
+0290         ?C0045:
+                                           ; SOURCE LINE # 103
+                                           ; SOURCE LINE # 104
+0290 E4                CLR     A
+0291 F500        R     MOV     i,A
+0293 F500        R     MOV     i+01H,A
+0295         ?C0046:
+0295 C3                CLR     C
+0296 E500        R     MOV     A,i+01H
+0298 9500        R     SUBB    A,length+01H
+029A E500        R     MOV     A,i
+029C 9500        R     SUBB    A,length
+029E 5016              JNC     ?C0047
+                                           ; SOURCE LINE # 105
+02A0 EB                MOV     A,R3
+02A1 2500        R     ADD     A,i+01H
+02A3 F582              MOV     DPL,A
+02A5 EA                MOV     A,R2
+02A6 3500        R     ADDC    A,i
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 14  
+
+02A8 F583              MOV     DPH,A
+02AA E4                CLR     A
+02AB F0                MOVX    @DPTR,A
+02AC 0500        R     INC     i+01H
+02AE E500        R     MOV     A,i+01H
+02B0 7002              JNZ     ?C0091
+02B2 0500        R     INC     i
+02B4         ?C0091:
+02B4 80DF              SJMP    ?C0046
+02B6         ?C0047:
+                                           ; SOURCE LINE # 106
+02B6 EA                MOV     A,R2
+02B7 F59A              MOV     AUTOPTRH1,A
+                                           ; SOURCE LINE # 107
+02B9 EB                MOV     A,R3
+02BA F59B              MOV     AUTOPTRL1,A
+                                           ; SOURCE LINE # 108
+02BC E4                CLR     A
+02BD F500        R     MOV     i,A
+02BF F500        R     MOV     i+01H,A
+02C1         ?C0049:
+02C1 C3                CLR     C
+02C2 E500        R     MOV     A,i+01H
+02C4 9500        R     SUBB    A,length+01H
+02C6 E500        R     MOV     A,i
+02C8 9500        R     SUBB    A,length
+02CA 5019              JNC     ?C0050
+                                           ; SOURCE LINE # 109
+                                           ; SOURCE LINE # 110
+02CC E500        R     MOV     A,i
+02CE 75F003            MOV     B,#03H
+02D1 A4                MUL     AB
+02D2 FF                MOV     R7,A
+02D3 E500        R     MOV     A,i+01H
+02D5 2F                ADD     A,R7
+02D6 FF                MOV     R7,A
+;---- Variable 'data1' assigned to Register 'R7' ----
+                                           ; SOURCE LINE # 111
+02D7 90E67B            MOV     DPTR,#XAUTODAT1
+02DA F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 112
+02DB 0500        R     INC     i+01H
+02DD E500        R     MOV     A,i+01H
+02DF 7002              JNZ     ?C0092
+02E1 0500        R     INC     i
+02E3         ?C0092:
+02E3 80DC              SJMP    ?C0049
+02E5         ?C0050:
+                                           ; SOURCE LINE # 114
+02E5 EA                MOV     A,R2
+02E6 F59A              MOV     AUTOPTRH1,A
+                                           ; SOURCE LINE # 115
+02E8 EB                MOV     A,R3
+02E9 F59B              MOV     AUTOPTRL1,A
+                                           ; SOURCE LINE # 116
+02EB E4                CLR     A
+02EC F500        R     MOV     i,A
+02EE F500        R     MOV     i+01H,A
+02F0         ?C0052:
+02F0 C3                CLR     C
+02F1 E500        R     MOV     A,i+01H
+02F3 9500        R     SUBB    A,length+01H
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 15  
+
+02F5 E500        R     MOV     A,i
+02F7 9500        R     SUBB    A,length
+02F9 5028              JNC     ?C0044
+                                           ; SOURCE LINE # 117
+                                           ; SOURCE LINE # 118
+02FB 90E67B            MOV     DPTR,#XAUTODAT1
+02FE E0                MOVX    A,@DPTR
+;---- Variable 'data2' assigned to Register 'R5' ----
+02FF FD                MOV     R5,A
+                                           ; SOURCE LINE # 119
+0300 E500        R     MOV     A,i
+0302 75F003            MOV     B,#03H
+0305 A4                MUL     AB
+0306 FF                MOV     R7,A
+0307 E500        R     MOV     A,i+01H
+0309 2F                ADD     A,R7
+030A 6D                XRL     A,R5
+030B 600C              JZ      ?C0054
+                                           ; SOURCE LINE # 120
+030D EB                MOV     A,R3
+030E 2500        R     ADD     A,i+01H
+0310 FF                MOV     R7,A
+0311 EA                MOV     A,R2
+0312 3500        R     ADDC    A,i
+0314 FE                MOV     R6,A
+0315 E4                CLR     A
+0316 FC                MOV     R4,A
+0317 FD                MOV     R5,A
+0318 22                RET     
+                                           ; SOURCE LINE # 121
+0319         ?C0054:
+0319 0500        R     INC     i+01H
+031B E500        R     MOV     A,i+01H
+031D 7002              JNZ     ?C0093
+031F 0500        R     INC     i
+0321         ?C0093:
+0321 80CD              SJMP    ?C0052
+                                           ; SOURCE LINE # 122
+0323         ?C0044:
+                                           ; SOURCE LINE # 124
+0323 74FF              MOV     A,#0FFH
+0325 FF                MOV     R7,A
+0326 FE                MOV     R6,A
+0327 FD                MOV     R5,A
+0328 FC                MOV     R4,A
+                                           ; SOURCE LINE # 125
+0329         ?C0008:
+0329 22                RET     
+             ; FUNCTION _test_mem (END)
+
+             ; FUNCTION _status (BEGIN)
+                                           ; SOURCE LINE # 127
+0000 8E00        R     MOV     stat,R6
+0002 8F00        R     MOV     stat+01H,R7
+                                           ; SOURCE LINE # 128
+                                           ; SOURCE LINE # 129
+0004 850000      R     MOV     saveStat,stat
+0007 850000      R     MOV     saveStat+01H,stat+01H
+000A         ?C0056:
+                                           ; SOURCE LINE # 132
+                                           ; SOURCE LINE # 133
+                                           ; SOURCE LINE # 134
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 16  
+
+000A 850000      R     MOV     stat,saveStat
+000D 850000      R     MOV     stat+01H,saveStat+01H
+                                           ; SOURCE LINE # 135
+0010 E4                CLR     A
+0011 F500        R     MOV     i,A
+0013         ?C0058:
+0013 E500        R     MOV     A,i
+0015 C3                CLR     C
+0016 9404              SUBB    A,#04H
+0018 5053              JNC     ?C0059
+                                           ; SOURCE LINE # 136
+                                           ; SOURCE LINE # 137
+001A E500        R     MOV     A,stat
+001C C4                SWAP    A
+001D 540F              ANL     A,#0FH
+001F 7E00              MOV     R6,#00H
+0021 540F              ANL     A,#0FH
+0023 2400        R     ADD     A,#LOW Digit
+0025 F582              MOV     DPL,A
+0027 EE                MOV     A,R6
+0028 3400        R     ADDC    A,#HIGH Digit
+002A AB82              MOV     R3,DPL
+002C FA                MOV     R2,A
+002D 7D01              MOV     R5,#01H
+002F 7F21              MOV     R7,#021H
+0031 120000      E     LCALL   _EZUSB_WriteI2C
+                                           ; SOURCE LINE # 138
+0034 7F21              MOV     R7,#021H
+0036 120000      E     LCALL   _EZUSB_WaitForEEPROMWrite
+                                           ; SOURCE LINE # 139
+0039 7F90              MOV     R7,#090H
+003B 7E01              MOV     R6,#01H
+003D 120000      E     LCALL   _EZUSB_Delay
+                                           ; SOURCE LINE # 140
+0040 7A00        R     MOV     R2,#HIGH blank
+0042 7B00        R     MOV     R3,#LOW blank
+0044 7D01              MOV     R5,#01H
+0046 7F21              MOV     R7,#021H
+0048 120000      E     LCALL   _EZUSB_WriteI2C
+                                           ; SOURCE LINE # 141
+004B 7F21              MOV     R7,#021H
+004D 120000      E     LCALL   _EZUSB_WaitForEEPROMWrite
+                                           ; SOURCE LINE # 142
+0050 7FC8              MOV     R7,#0C8H
+0052 7E00              MOV     R6,#00H
+0054 120000      E     LCALL   _EZUSB_Delay
+                                           ; SOURCE LINE # 143
+0057 0500        R     INC     i
+0059 E500        R     MOV     A,stat+01H
+005B C4                SWAP    A
+005C F8                MOV     R0,A
+005D 540F              ANL     A,#0FH
+005F C8                XCH     A,R0
+0060 68                XRL     A,R0
+0061 F500        R     MOV     stat+01H,A
+0063 E500        R     MOV     A,stat
+0065 C4                SWAP    A
+0066 54F0              ANL     A,#0F0H
+0068 48                ORL     A,R0
+0069 F500        R     MOV     stat,A
+006B 80A6              SJMP    ?C0058
+006D         ?C0059:
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 17  
+
+                                           ; SOURCE LINE # 144
+006D 7A00        R     MOV     R2,#HIGH blank
+006F 7B00        R     MOV     R3,#LOW blank
+0071 7D01              MOV     R5,#01H
+0073 7F21              MOV     R7,#021H
+0075 120000      E     LCALL   _EZUSB_WriteI2C
+                                           ; SOURCE LINE # 145
+0078 7F21              MOV     R7,#021H
+007A 120000      E     LCALL   _EZUSB_WaitForEEPROMWrite
+                                           ; SOURCE LINE # 146
+007D 7FF4              MOV     R7,#0F4H
+007F 7E01              MOV     R6,#01H
+0081 120000      E     LCALL   _EZUSB_Delay
+                                           ; SOURCE LINE # 147
+0084 8084              SJMP    ?C0056
+0086 22                RET     
+             ; FUNCTION _status (END)
+
+             ; FUNCTION _statString (BEGIN)
+                                           ; SOURCE LINE # 150
+0000 8B00        R     MOV     stat,R3
+0002 8A00        R     MOV     stat+01H,R2
+0004 8900        R     MOV     stat+02H,R1
+                                           ; SOURCE LINE # 151
+                                           ; SOURCE LINE # 154
+0006 E4                CLR     A
+0007 F500        R     MOV     i,A
+0009         ?C0062:
+0009 AB00        R     MOV     R3,stat
+000B AA00        R     MOV     R2,stat+01H
+000D A900        R     MOV     R1,stat+02H
+000F 850082      R     MOV     DPL,i
+0012 758300            MOV     DPH,#00H
+0015 120000      E     LCALL   ?C?CLDOPTR
+0018 FF                MOV     R7,A
+0019 6040              JZ      ?C0063
+                                           ; SOURCE LINE # 155
+                                           ; SOURCE LINE # 156
+001B 545F              ANL     A,#05FH
+001D FF                MOV     R7,A
+001E 33                RLC     A
+001F 95E0              SUBB    A,ACC
+0021 FE                MOV     R6,A
+0022 7400        R     MOV     A,#LOW Alpha+0FFBFH
+0024 2F                ADD     A,R7
+0025 F582              MOV     DPL,A
+0027 7400        R     MOV     A,#HIGH Alpha+0FFBFH
+0029 3E                ADDC    A,R6
+002A AB82              MOV     R3,DPL
+002C FA                MOV     R2,A
+002D 7D01              MOV     R5,#01H
+002F 7F21              MOV     R7,#021H
+0031 120000      E     LCALL   _EZUSB_WriteI2C
+                                           ; SOURCE LINE # 157
+0034 7F21              MOV     R7,#021H
+0036 120000      E     LCALL   _EZUSB_WaitForEEPROMWrite
+                                           ; SOURCE LINE # 158
+0039 7F90              MOV     R7,#090H
+003B 7E01              MOV     R6,#01H
+003D 120000      E     LCALL   _EZUSB_Delay
+                                           ; SOURCE LINE # 159
+0040 7A00        R     MOV     R2,#HIGH blank
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 18  
+
+0042 7B00        R     MOV     R3,#LOW blank
+0044 7D01              MOV     R5,#01H
+0046 7F21              MOV     R7,#021H
+0048 120000      E     LCALL   _EZUSB_WriteI2C
+                                           ; SOURCE LINE # 160
+004B 7F21              MOV     R7,#021H
+004D 120000      E     LCALL   _EZUSB_WaitForEEPROMWrite
+                                           ; SOURCE LINE # 161
+0050 7FC8              MOV     R7,#0C8H
+0052 7E00              MOV     R6,#00H
+0054 120000      E     LCALL   _EZUSB_Delay
+                                           ; SOURCE LINE # 162
+0057 0500        R     INC     i
+0059 80AE              SJMP    ?C0062
+005B         ?C0063:
+                                           ; SOURCE LINE # 163
+005B 7A00        R     MOV     R2,#HIGH blank
+005D 7B00        R     MOV     R3,#LOW blank
+005F 7D01              MOV     R5,#01H
+0061 7F21              MOV     R7,#021H
+0063 120000      E     LCALL   _EZUSB_WriteI2C
+                                           ; SOURCE LINE # 164
+0066 7F21              MOV     R7,#021H
+0068 120000      E     LCALL   _EZUSB_WaitForEEPROMWrite
+                                           ; SOURCE LINE # 165
+006B 7FF4              MOV     R7,#0F4H
+006D 7E01              MOV     R6,#01H
+006F 120000      E     LCALL   _EZUSB_Delay
+                                           ; SOURCE LINE # 166
+0072 22                RET     
+             ; FUNCTION _statString (END)
+
+             ; FUNCTION main (BEGIN)
+                                           ; SOURCE LINE # 168
+                                           ; SOURCE LINE # 169
+                                           ; SOURCE LINE # 171
+0000 E4                CLR     A
+0001 900000      R     MOV     DPTR,#buttons
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 172
+0005 A3                INC     DPTR
+0006 04                INC     A
+0007 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 175
+0008 120000      E     LCALL   EZUSB_InitI2C
+                                           ; SOURCE LINE # 176
+000B 90E600            MOV     DPTR,#CPUCS
+000E 7410              MOV     A,#010H
+0010 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 177
+0011 A3                INC     DPTR
+0012 74F6              MOV     A,#0F6H
+0014 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 180
+0015 43AF01            ORL     AUTOPTRSETUP,#01H
+                                           ; SOURCE LINE # 182
+0018 7A00        R     MOV     R2,#HIGH Digit
+001A 7B00        R     MOV     R3,#LOW Digit
+001C 7D01              MOV     R5,#01H
+001E 7F21              MOV     R7,#021H
+0020 120000      E     LCALL   _EZUSB_WriteI2C
+                                           ; SOURCE LINE # 183
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 19  
+
+0023 7F21              MOV     R7,#021H
+0025 120000      E     LCALL   _EZUSB_WaitForEEPROMWrite
+0028         ?C0066:
+                                           ; SOURCE LINE # 185
+0028 900000      R     MOV     DPTR,#cont_loop
+002B E0                MOVX    A,@DPTR
+002C 7003              JNZ     $ + 5H
+002E 020000      R     LJMP    ?C0067
+                                           ; SOURCE LINE # 186
+                                           ; SOURCE LINE # 188
+0031 7D00              MOV     R5,#00H
+0033 7C14              MOV     R4,#014H
+0035 7F00              MOV     R7,#00H
+0037 7E0C              MOV     R6,#0CH
+0039 120000      R     LCALL   _test_mem
+003C 8F00        R     MOV     addr+03H,R7
+003E 8E00        R     MOV     addr+02H,R6
+0040 8D00        R     MOV     addr+01H,R5
+0042 8C00        R     MOV     addr,R4
+                                           ; SOURCE LINE # 189
+0044 74FF              MOV     A,#0FFH
+0046 FF                MOV     R7,A
+0047 FE                MOV     R6,A
+0048 FD                MOV     R5,A
+0049 FC                MOV     R4,A
+004A AB00        R     MOV     R3,addr+03H
+004C AA00        R     MOV     R2,addr+02H
+004E A900        R     MOV     R1,addr+01H
+0050 A800        R     MOV     R0,addr
+0052 C3                CLR     C
+0053 120000      E     LCALL   ?C?SLCMP
+0056 6007              JZ      ?C0068
+                                           ; SOURCE LINE # 190
+0058 AE00        R     MOV     R6,addr+02H
+005A AF00        R     MOV     R7,addr+03H
+005C 120000      R     LCALL   _status
+005F         ?C0068:
+                                           ; SOURCE LINE # 194
+005F 90E628            MOV     DPTR,#ECCCFG
+0062 7401              MOV     A,#01H
+0064 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 195
+0065 E0                MOVX    A,@DPTR
+0066 B4012E            CJNE    A,#01H,?C0069
+                                           ; SOURCE LINE # 196
+                                           ; SOURCE LINE # 197
+0069 7D00              MOV     R5,#00H
+006B 7C20              MOV     R4,#020H
+006D 7F00              MOV     R7,#00H
+006F 7E20              MOV     R6,#020H
+0071 120000      R     LCALL   _test_mem
+0074 8F00        R     MOV     addr+03H,R7
+0076 8E00        R     MOV     addr+02H,R6
+0078 8D00        R     MOV     addr+01H,R5
+007A 8C00        R     MOV     addr,R4
+                                           ; SOURCE LINE # 198
+007C 74FF              MOV     A,#0FFH
+007E FF                MOV     R7,A
+007F FE                MOV     R6,A
+0080 FD                MOV     R5,A
+0081 FC                MOV     R4,A
+0082 AB00        R     MOV     R3,addr+03H
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 20  
+
+0084 AA00        R     MOV     R2,addr+02H
+0086 A900        R     MOV     R1,addr+01H
+0088 A800        R     MOV     R0,addr
+008A C3                CLR     C
+008B 120000      E     LCALL   ?C?SLCMP
+008E 6007              JZ      ?C0069
+                                           ; SOURCE LINE # 199
+0090 AE00        R     MOV     R6,addr+02H
+0092 AF00        R     MOV     R7,addr+03H
+0094 120000      R     LCALL   _status
+                                           ; SOURCE LINE # 200
+0097         ?C0069:
+                                           ; SOURCE LINE # 206
+0097 7D00              MOV     R5,#00H
+0099 7C02              MOV     R4,#02H
+009B 7F00              MOV     R7,#00H
+009D 7EE0              MOV     R6,#0E0H
+009F 120000      R     LCALL   _test_mem
+00A2 8F00        R     MOV     addr+03H,R7
+00A4 8E00        R     MOV     addr+02H,R6
+00A6 8D00        R     MOV     addr+01H,R5
+00A8 8C00        R     MOV     addr,R4
+                                           ; SOURCE LINE # 207
+00AA 74FF              MOV     A,#0FFH
+00AC FF                MOV     R7,A
+00AD FE                MOV     R6,A
+00AE FD                MOV     R5,A
+00AF FC                MOV     R4,A
+00B0 AB00        R     MOV     R3,addr+03H
+00B2 AA00        R     MOV     R2,addr+02H
+00B4 A900        R     MOV     R1,addr+01H
+00B6 A800        R     MOV     R0,addr
+00B8 C3                CLR     C
+00B9 120000      E     LCALL   ?C?SLCMP
+00BC 6007              JZ      ?C0071
+                                           ; SOURCE LINE # 208
+00BE AE00        R     MOV     R6,addr+02H
+00C0 AF00        R     MOV     R7,addr+03H
+00C2 120000      R     LCALL   _status
+00C5         ?C0071:
+                                           ; SOURCE LINE # 210
+00C5 7D00              MOV     R5,#00H
+00C7 7C02              MOV     R4,#02H
+00C9 7F00              MOV     R7,#00H
+00CB 7EF0              MOV     R6,#0F0H
+00CD 120000      R     LCALL   _test_mem
+00D0 8F00        R     MOV     addr+03H,R7
+00D2 8E00        R     MOV     addr+02H,R6
+00D4 8D00        R     MOV     addr+01H,R5
+00D6 8C00        R     MOV     addr,R4
+                                           ; SOURCE LINE # 211
+00D8 74FF              MOV     A,#0FFH
+00DA FF                MOV     R7,A
+00DB FE                MOV     R6,A
+00DC FD                MOV     R5,A
+00DD FC                MOV     R4,A
+00DE AB00        R     MOV     R3,addr+03H
+00E0 AA00        R     MOV     R2,addr+02H
+00E2 A900        R     MOV     R1,addr+01H
+00E4 A800        R     MOV     R0,addr
+00E6 C3                CLR     C
+00E7 120000      E     LCALL   ?C?SLCMP
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 21  
+
+00EA 6007              JZ      ?C0072
+                                           ; SOURCE LINE # 212
+00EC AE00        R     MOV     R6,addr+02H
+00EE AF00        R     MOV     R7,addr+03H
+00F0 120000      R     LCALL   _status
+00F3         ?C0072:
+                                           ; SOURCE LINE # 214
+00F3 7D00              MOV     R5,#00H
+00F5 7C02              MOV     R4,#02H
+00F7 7F00              MOV     R7,#00H
+00F9 7EF4              MOV     R6,#0F4H
+00FB 120000      R     LCALL   _test_mem
+00FE 8F00        R     MOV     addr+03H,R7
+0100 8E00        R     MOV     addr+02H,R6
+0102 8D00        R     MOV     addr+01H,R5
+0104 8C00        R     MOV     addr,R4
+                                           ; SOURCE LINE # 215
+0106 74FF              MOV     A,#0FFH
+0108 FF                MOV     R7,A
+0109 FE                MOV     R6,A
+010A FD                MOV     R5,A
+010B FC                MOV     R4,A
+010C AB00        R     MOV     R3,addr+03H
+010E AA00        R     MOV     R2,addr+02H
+0110 A900        R     MOV     R1,addr+01H
+0112 A800        R     MOV     R0,addr
+0114 C3                CLR     C
+0115 120000      E     LCALL   ?C?SLCMP
+0118 6007              JZ      ?C0073
+                                           ; SOURCE LINE # 216
+011A AE00        R     MOV     R6,addr+02H
+011C AF00        R     MOV     R7,addr+03H
+011E 120000      R     LCALL   _status
+0121         ?C0073:
+                                           ; SOURCE LINE # 218
+0121 7D00              MOV     R5,#00H
+0123 7C02              MOV     R4,#02H
+0125 7F00              MOV     R7,#00H
+0127 7EF8              MOV     R6,#0F8H
+0129 120000      R     LCALL   _test_mem
+012C 8F00        R     MOV     addr+03H,R7
+012E 8E00        R     MOV     addr+02H,R6
+0130 8D00        R     MOV     addr+01H,R5
+0132 8C00        R     MOV     addr,R4
+                                           ; SOURCE LINE # 219
+0134 74FF              MOV     A,#0FFH
+0136 FF                MOV     R7,A
+0137 FE                MOV     R6,A
+0138 FD                MOV     R5,A
+0139 FC                MOV     R4,A
+013A AB00        R     MOV     R3,addr+03H
+013C AA00        R     MOV     R2,addr+02H
+013E A900        R     MOV     R1,addr+01H
+0140 A800        R     MOV     R0,addr
+0142 C3                CLR     C
+0143 120000      E     LCALL   ?C?SLCMP
+0146 6007              JZ      ?C0074
+                                           ; SOURCE LINE # 220
+0148 AE00        R     MOV     R6,addr+02H
+014A AF00        R     MOV     R7,addr+03H
+014C 120000      R     LCALL   _status
+014F         ?C0074:
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 22  
+
+                                           ; SOURCE LINE # 222
+014F 7D00              MOV     R5,#00H
+0151 7C02              MOV     R4,#02H
+0153 7F00              MOV     R7,#00H
+0155 7EFC              MOV     R6,#0FCH
+0157 120000      R     LCALL   _test_mem
+015A 8F00        R     MOV     addr+03H,R7
+015C 8E00        R     MOV     addr+02H,R6
+015E 8D00        R     MOV     addr+01H,R5
+0160 8C00        R     MOV     addr,R4
+                                           ; SOURCE LINE # 223
+0162 74FF              MOV     A,#0FFH
+0164 FF                MOV     R7,A
+0165 FE                MOV     R6,A
+0166 FD                MOV     R5,A
+0167 FC                MOV     R4,A
+0168 AB00        R     MOV     R3,addr+03H
+016A AA00        R     MOV     R2,addr+02H
+016C A900        R     MOV     R1,addr+01H
+016E A800        R     MOV     R0,addr
+0170 C3                CLR     C
+0171 120000      E     LCALL   ?C?SLCMP
+0174 6007              JZ      ?C0075
+                                           ; SOURCE LINE # 224
+0176 AE00        R     MOV     R6,addr+02H
+0178 AF00        R     MOV     R7,addr+03H
+017A 120000      R     LCALL   _status
+017D         ?C0075:
+                                           ; SOURCE LINE # 226
+017D 90E601            MOV     DPTR,#IFCONFIG
+0180 7402              MOV     A,#02H
+0182 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 228
+0183 7D7F              MOV     R5,#07FH
+0185 7C00              MOV     R4,#00H
+0187 7F00              MOV     R7,#00H
+0189 7EE4              MOV     R6,#0E4H
+018B 120000      R     LCALL   _test_mem
+018E 8F00        R     MOV     addr+03H,R7
+0190 8E00        R     MOV     addr+02H,R6
+0192 8D00        R     MOV     addr+01H,R5
+0194 8C00        R     MOV     addr,R4
+                                           ; SOURCE LINE # 229
+0196 74FF              MOV     A,#0FFH
+0198 FF                MOV     R7,A
+0199 FE                MOV     R6,A
+019A FD                MOV     R5,A
+019B FC                MOV     R4,A
+019C AB00        R     MOV     R3,addr+03H
+019E AA00        R     MOV     R2,addr+02H
+01A0 A900        R     MOV     R1,addr+01H
+01A2 A800        R     MOV     R0,addr
+01A4 C3                CLR     C
+01A5 120000      E     LCALL   ?C?SLCMP
+01A8 6007              JZ      ?C0076
+                                           ; SOURCE LINE # 230
+01AA AE00        R     MOV     R6,addr+02H
+01AC AF00        R     MOV     R7,addr+03H
+01AE 120000      R     LCALL   _status
+01B1         ?C0076:
+                                           ; SOURCE LINE # 232
+01B1 7DBF              MOV     R5,#0BFH
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 23  
+
+01B3 7C00              MOV     R4,#00H
+01B5 7F40              MOV     R7,#040H
+01B7 7EE7              MOV     R6,#0E7H
+01B9 120000      R     LCALL   _test_mem
+01BC 8F00        R     MOV     addr+03H,R7
+01BE 8E00        R     MOV     addr+02H,R6
+01C0 8D00        R     MOV     addr+01H,R5
+01C2 8C00        R     MOV     addr,R4
+                                           ; SOURCE LINE # 233
+01C4 74FF              MOV     A,#0FFH
+01C6 FF                MOV     R7,A
+01C7 FE                MOV     R6,A
+01C8 FD                MOV     R5,A
+01C9 FC                MOV     R4,A
+01CA AB00        R     MOV     R3,addr+03H
+01CC AA00        R     MOV     R2,addr+02H
+01CE A900        R     MOV     R1,addr+01H
+01D0 A800        R     MOV     R0,addr
+01D2 C3                CLR     C
+01D3 120000      E     LCALL   ?C?SLCMP
+01D6 6007              JZ      ?C0077
+                                           ; SOURCE LINE # 234
+01D8 AE00        R     MOV     R6,addr+02H
+01DA AF00        R     MOV     R7,addr+03H
+01DC 120000      R     LCALL   _status
+01DF         ?C0077:
+                                           ; SOURCE LINE # 242
+                                           ; SOURCE LINE # 243
+01DF 7BFF              MOV     R3,#0FFH
+01E1 7A00        R     MOV     R2,#HIGH ?SC_0
+01E3 7900        R     MOV     R1,#LOW ?SC_0
+01E5 120000      R     LCALL   _statString
+                                           ; SOURCE LINE # 244
+                                           ; SOURCE LINE # 245
+01E8 020000      R     LJMP    ?C0066
+01EB         ?C0067:
+                                           ; SOURCE LINE # 247
+01EB 7BFF              MOV     R3,#0FFH
+01ED 7A00        R     MOV     R2,#HIGH ?SC_5
+01EF 7900        R     MOV     R1,#LOW ?SC_5
+01F1 120000      R     LCALL   _statString
+                                           ; SOURCE LINE # 248
+01F4 7A00        R     MOV     R2,#HIGH buttons
+01F6 7B00        R     MOV     R3,#LOW buttons
+01F8 7D01              MOV     R5,#01H
+01FA 7F20              MOV     R7,#020H
+01FC 120000      E     LCALL   _EZUSB_ReadI2C
+                                           ; SOURCE LINE # 250
+01FF 22                RET     
+             ; FUNCTION main (END)
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1572    ----
+   CONSTANT SIZE    =      9    ----
+   XDATA SIZE       =     43       2
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      1      17
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+C51 COMPILER V7.06   MEMTEST                                                               06/13/2012 13:37:23 PAGE 24  
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

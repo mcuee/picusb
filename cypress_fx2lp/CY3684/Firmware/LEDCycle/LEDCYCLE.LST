@@ -1,0 +1,459 @@
+A51 MACRO ASSEMBLER  LEDCYCLE                                                             06/13/2012 13:21:42 PAGE     1
+
+
+MACRO ASSEMBLER A51 V7.07
+OBJECT MODULE PLACED IN LEDCycle.OBJ
+ASSEMBLER INVOKED BY: C:\Keil\C51\BIN\A51.EXE LEDCycle.a51 INCDIR(..\..\Target\Inc) SET(SMALL) DEBUG EP
+
+LOC  OBJ            LINE     SOURCE
+
+                       1     ;--------------------------------------------------------------
+                       2     ; LEDCycle.A51
+                       3     ;
+                       4     ; Check for signs of life on FX2 IO ports
+                       5     ;--------------------------------------------------------------
+                       6     $nomod51                ; disable predefined 8051 registers
+                     507     $list 
+                     508     ;
+                     509     NAME            portio
+                     510     ;
+----                 511                     ISEG AT 60H             ; stack
+0060                 512     stack:          ds      20
+                     513     ;
+----                 514                     DSEG at 20H             ; bit-addressable
+0020                 515     litebits:       ds      1
+                     516     ;
+----                 517                     CSEG    AT      0       ; absolute Segment at Address 0
+0000 021400          518                     LJMP    start           ; Jump over the interrupt vectors
+                     519     ; -------------------------------------------------
+1400                 520                     org     1400h           
+                     521     ; -------------------------------------------------
+1400 75815F          522     start:          mov     SP,#STACK-1     ; set stack
+                     523     ;
+1403 9107            524     lth:            call    cycle_lites
+1405 80FC            525                     sjmp    lth
+                     526     ;
+1407                 527     cycle_lites:
+1407 908800          528           mov       dptr,#8800h  ; LED2 ON
+140A E0              529                     movx    a,@dptr
+140B 9138            530                     call    delay
+140D 909800          531                     mov     dptr,#9800h  ; LED3 ON
+1410 E0              532                     movx    a,@dptr
+1411 9138            533                     call    delay
+1413 90A800          534                     mov     dptr,#0A800h  ; LED4 ON
+1416 E0              535                     movx    a,@dptr
+1417 9138            536                     call    delay
+1419 90B800          537                     mov     dptr,#0B800h  ; LED5 ON
+141C E0              538                     movx    a,@dptr
+141D 9138            539                     call    delay
+141F 908000          540                     mov     dptr,#8000h   ; LED2 OFF
+1422 E0              541                     movx    a,@dptr
+1423 9138            542                     call    delay
+1425 909000          543                     mov     dptr,#9000h   ; LED3 OFF
+1428 E0              544                     movx    a,@dptr
+1429 9138            545                     call    delay
+142B 90A000          546                     mov     dptr,#0A000h   ; LED4 OFF
+142E E0              547                     movx    a,@dptr
+142F 9138            548                     call    delay
+1431 90B000          549                     mov     dptr,#0B000h   ; LED5 OFF
+1434 E0              550                     movx    a,@dptr
+1435 9138            551                     call    delay
+1437 22              552                     ret
+                     553     ;
+1438 7A04            554     delay:          mov     r2,#4
+143A D8FE            555     dl1:            djnz    r0,dl1
+143C D9FC            556                     djnz    r1,dl1
+143E DAFA            557                     djnz    r2,dl1
+1440 22              558                     ret
+A51 MACRO ASSEMBLER  LEDCYCLE                                                             06/13/2012 13:21:42 PAGE     2
+
+                     559     ;
+                     560                     END
+                             
+A51 MACRO ASSEMBLER  LEDCYCLE                                                             06/13/2012 13:21:42 PAGE     3
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E             T Y P E  V A L U E   ATTRIBUTES
+
+AC . . . . . . . .  B ADDR   00D0H.6 A   
+ACC. . . . . . . .  D ADDR   00E0H   A   
+APTR1H . . . . . .  D ADDR   009AH   A   
+APTR1L . . . . . .  D ADDR   009BH   A   
+AUTOPTR1H. . . . .  D ADDR   009AH   A   
+AUTOPTR1L. . . . .  D ADDR   009BH   A   
+AUTOPTRH1. . . . .  D ADDR   009AH   A   
+AUTOPTRH2. . . . .  D ADDR   009DH   A   
+AUTOPTRL1. . . . .  D ADDR   009BH   A   
+AUTOPTRL2. . . . .  D ADDR   009EH   A   
+AUTOPTRSETUP . . .  D ADDR   00AFH   A   
+B. . . . . . . . .  D ADDR   00F0H   A   
+BPADDRH. . . . . .  X ADDR   E606H   A   
+BPADDRL. . . . . .  X ADDR   E607H   A   
+BREAKPT. . . . . .  X ADDR   E605H   A   
+CKCON. . . . . . .  D ADDR   008EH   A   
+CLRERRCNT. . . . .  X ADDR   E665H   A   
+CPUCS. . . . . . .  X ADDR   E600H   A   
+CP_RL2 . . . . . .  B ADDR   00C8H.0 A   
+CT1. . . . . . . .  X ADDR   E6FBH   A   
+CT2. . . . . . . .  X ADDR   E6FCH   A   
+CT3. . . . . . . .  X ADDR   E6FDH   A   
+CT4. . . . . . . .  X ADDR   E6FEH   A   
+CY . . . . . . . .  B ADDR   00D0H.7 A   
+CYCLE_LITES. . . .  C ADDR   1407H   A   
+C_T2 . . . . . . .  B ADDR   00C8H.1 A   
+DBUG . . . . . . .  X ADDR   E6F8H   A   
+DELAY. . . . . . .  C ADDR   1438H   A   
+DL1. . . . . . . .  C ADDR   143AH   A   
+DPH. . . . . . . .  D ADDR   0083H   A   
+DPH1 . . . . . . .  D ADDR   0085H   A   
+DPL. . . . . . . .  D ADDR   0082H   A   
+DPL1 . . . . . . .  D ADDR   0084H   A   
+DPS. . . . . . . .  D ADDR   0086H   A   
+EA . . . . . . . .  B ADDR   00A8H.7 A   
+ECC1B0 . . . . . .  X ADDR   E62AH   A   
+ECC1B1 . . . . . .  X ADDR   E62BH   A   
+ECC1B2 . . . . . .  X ADDR   E62CH   A   
+ECC2B0 . . . . . .  X ADDR   E62DH   A   
+ECC2B1 . . . . . .  X ADDR   E62EH   A   
+ECC2B2 . . . . . .  X ADDR   E62FH   A   
+ECCCFG . . . . . .  X ADDR   E628H   A   
+ECCRESET . . . . .  X ADDR   E629H   A   
+EI2C . . . . . . .  B ADDR   00E8H.1 A   
+EICON. . . . . . .  D ADDR   00D8H   A   
+EIE. . . . . . . .  D ADDR   00E8H   A   
+EIEX4. . . . . . .  B ADDR   00E8H.2 A   
+EIEX5. . . . . . .  B ADDR   00E8H.3 A   
+EIEX6. . . . . . .  B ADDR   00E8H.4 A   
+EIP. . . . . . . .  D ADDR   00F8H   A   
+EIPX4. . . . . . .  B ADDR   00F8H.2 A   
+EIPX5. . . . . . .  B ADDR   00F8H.3 A   
+EIPX6. . . . . . .  B ADDR   00F8H.4 A   
+EP01STAT . . . . .  D ADDR   00BAH   A   
+EP0BCH . . . . . .  X ADDR   E68AH   A   
+EP0BCL . . . . . .  X ADDR   E68BH   A   
+EP0BUF . . . . . .  X ADDR   E740H   A   
+EP0CS. . . . . . .  X ADDR   E6A0H   A   
+EP1INBC. . . . . .  X ADDR   E68FH   A   
+EP1INBUF . . . . .  X ADDR   E7C0H   A   
+A51 MACRO ASSEMBLER  LEDCYCLE                                                             06/13/2012 13:21:42 PAGE     4
+
+EP1INCFG . . . . .  X ADDR   E611H   A   
+EP1INCS. . . . . .  X ADDR   E6A2H   A   
+EP1OUTBC . . . . .  X ADDR   E68DH   A   
+EP1OUTBUF. . . . .  X ADDR   E780H   A   
+EP1OUTCFG. . . . .  X ADDR   E610H   A   
+EP1OUTCS . . . . .  X ADDR   E6A1H   A   
+EP2468STAT . . . .  D ADDR   00AAH   A   
+EP24FIFOFLGS . . .  D ADDR   00ABH   A   
+EP2AUTOINLENH. . .  X ADDR   E620H   A   
+EP2AUTOINLENL. . .  X ADDR   E621H   A   
+EP2BCH . . . . . .  X ADDR   E690H   A   
+EP2BCL . . . . . .  X ADDR   E691H   A   
+EP2CFG . . . . . .  X ADDR   E612H   A   
+EP2CS. . . . . . .  X ADDR   E6A3H   A   
+EP2FIFOBCH . . . .  X ADDR   E6ABH   A   
+EP2FIFOBCL . . . .  X ADDR   E6ACH   A   
+EP2FIFOBUF . . . .  X ADDR   F000H   A   
+EP2FIFOCFG . . . .  X ADDR   E618H   A   
+EP2FIFOFLGS. . . .  X ADDR   E6A7H   A   
+EP2FIFOIE. . . . .  X ADDR   E650H   A   
+EP2FIFOIRQ . . . .  X ADDR   E651H   A   
+EP2FIFOPFH . . . .  X ADDR   E630H   A   
+EP2FIFOPFL . . . .  X ADDR   E631H   A   
+EP2GPIFFLGSEL. . .  X ADDR   E6D2H   A   
+EP2GPIFPFSTOP. . .  X ADDR   E6D3H   A   
+EP2GPIFTCH . . . .  X ADDR   E6D0H   A   
+EP2GPIFTCL . . . .  X ADDR   E6D1H   A   
+EP2GPIFTRIG. . . .  X ADDR   E6D4H   A   
+EP2ISOINPKTS . . .  X ADDR   E640H   A   
+EP4AUTOINLENH. . .  X ADDR   E622H   A   
+EP4AUTOINLENL. . .  X ADDR   E623H   A   
+EP4BCH . . . . . .  X ADDR   E694H   A   
+EP4BCL . . . . . .  X ADDR   E695H   A   
+EP4CFG . . . . . .  X ADDR   E613H   A   
+EP4CS. . . . . . .  X ADDR   E6A4H   A   
+EP4FIFOBCH . . . .  X ADDR   E6ADH   A   
+EP4FIFOBCL . . . .  X ADDR   E6AEH   A   
+EP4FIFOBUF . . . .  X ADDR   F400H   A   
+EP4FIFOCFG . . . .  X ADDR   E619H   A   
+EP4FIFOFLGS. . . .  X ADDR   E6A8H   A   
+EP4FIFOIE. . . . .  X ADDR   E652H   A   
+EP4FIFOIRQ . . . .  X ADDR   E653H   A   
+EP4FIFOPFH . . . .  X ADDR   E632H   A   
+EP4FIFOPFL . . . .  X ADDR   E633H   A   
+EP4GPIFFLGSEL. . .  X ADDR   E6DAH   A   
+EP4GPIFPFSTOP. . .  X ADDR   E6DBH   A   
+EP4GPIFTCH . . . .  X ADDR   E6D0H   A   
+EP4GPIFTCL . . . .  X ADDR   E6D1H   A   
+EP4GPIFTRIG. . . .  X ADDR   E6DCH   A   
+EP4ISOINPKTS . . .  X ADDR   E641H   A   
+EP68FIFOFLGS . . .  D ADDR   00ACH   A   
+EP6AUTOINLENH. . .  X ADDR   E624H   A   
+EP6AUTOINLENL. . .  X ADDR   E625H   A   
+EP6BCH . . . . . .  X ADDR   E698H   A   
+EP6BCL . . . . . .  X ADDR   E699H   A   
+EP6CFG . . . . . .  X ADDR   E614H   A   
+EP6CS. . . . . . .  X ADDR   E6A5H   A   
+EP6FIFOBCH . . . .  X ADDR   E6AFH   A   
+EP6FIFOBCL . . . .  X ADDR   E6B0H   A   
+EP6FIFOBUF . . . .  X ADDR   F800H   A   
+EP6FIFOCFG . . . .  X ADDR   E61AH   A   
+EP6FIFOFLGS. . . .  X ADDR   E6A9H   A   
+EP6FIFOIE. . . . .  X ADDR   E654H   A   
+EP6FIFOIRQ . . . .  X ADDR   E655H   A   
+EP6FIFOPFH . . . .  X ADDR   E634H   A   
+EP6FIFOPFL . . . .  X ADDR   E635H   A   
+A51 MACRO ASSEMBLER  LEDCYCLE                                                             06/13/2012 13:21:42 PAGE     5
+
+EP6GPIFFLGSEL. . .  X ADDR   E6E2H   A   
+EP6GPIFPFSTOP. . .  X ADDR   E6E3H   A   
+EP6GPIFTCH . . . .  X ADDR   E6D0H   A   
+EP6GPIFTCL . . . .  X ADDR   E6D1H   A   
+EP6GPIFTRIG. . . .  X ADDR   E6E4H   A   
+EP6ISOINPKTS . . .  X ADDR   E642H   A   
+EP8AUTOINLENH. . .  X ADDR   E626H   A   
+EP8AUTOINLENL. . .  X ADDR   E627H   A   
+EP8BCH . . . . . .  X ADDR   E69CH   A   
+EP8BCL . . . . . .  X ADDR   E69DH   A   
+EP8CFG . . . . . .  X ADDR   E615H   A   
+EP8CS. . . . . . .  X ADDR   E6A6H   A   
+EP8FIFOBCH . . . .  X ADDR   E6B1H   A   
+EP8FIFOBCL . . . .  X ADDR   E6B2H   A   
+EP8FIFOBUF . . . .  X ADDR   FC00H   A   
+EP8FIFOCFG . . . .  X ADDR   E61BH   A   
+EP8FIFOFLGS. . . .  X ADDR   E6AAH   A   
+EP8FIFOIE. . . . .  X ADDR   E656H   A   
+EP8FIFOIRQ . . . .  X ADDR   E657H   A   
+EP8FIFOPFH . . . .  X ADDR   E636H   A   
+EP8FIFOPFL . . . .  X ADDR   E637H   A   
+EP8GPIFFLGSEL. . .  X ADDR   E6EAH   A   
+EP8GPIFPFSTOP. . .  X ADDR   E6EBH   A   
+EP8GPIFTCH . . . .  X ADDR   E6D0H   A   
+EP8GPIFTCL . . . .  X ADDR   E6D1H   A   
+EP8GPIFTRIG. . . .  X ADDR   E6ECH   A   
+EP8ISOINPKTS . . .  X ADDR   E643H   A   
+EPIE . . . . . . .  X ADDR   E65EH   A   
+EPIRQ. . . . . . .  X ADDR   E65FH   A   
+ERESI. . . . . . .  B ADDR   00D8H.5 A   
+ERRCNTLIM. . . . .  X ADDR   E664H   A   
+ES0. . . . . . . .  B ADDR   00A8H.4 A   
+ES1. . . . . . . .  B ADDR   00A8H.6 A   
+ET0. . . . . . . .  B ADDR   00A8H.1 A   
+ET1. . . . . . . .  B ADDR   00A8H.3 A   
+ET2. . . . . . . .  B ADDR   00A8H.5 A   
+EUSB . . . . . . .  B ADDR   00E8H.0 A   
+EX0. . . . . . . .  B ADDR   00A8H.0 A   
+EX1. . . . . . . .  B ADDR   00A8H.2 A   
+EXEN2. . . . . . .  B ADDR   00C8H.3 A   
+EXF2 . . . . . . .  B ADDR   00C8H.6 A   
+EXIF . . . . . . .  D ADDR   0091H   A   
+EXTAUTODAT1. . . .  X ADDR   E67BH   A   
+EXTAUTODAT2. . . .  X ADDR   E67CH   A   
+F0 . . . . . . . .  B ADDR   00D0H.5 A   
+FIFOPINPOLAR . . .  X ADDR   E609H   A   
+FIFORESET. . . . .  X ADDR   E604H   A   
+FL . . . . . . . .  B ADDR   00D0H.1 A   
+FLOWEDGE . . . . .  X ADDR   E6CCH   A   
+FLOWEQ0CTL . . . .  X ADDR   E6C8H   A   
+FLOWEQ1CTL . . . .  X ADDR   E6C9H   A   
+FLOWLOGIC. . . . .  X ADDR   E6C7H   A   
+FLOWSTATE. . . . .  X ADDR   E6C6H   A   
+FLOWSTB. . . . . .  X ADDR   E6CBH   A   
+FLOWSTBHPERIOD . .  X ADDR   E6CDH   A   
+FNADDR . . . . . .  X ADDR   E687H   A   
+GPCR2. . . . . . .  X ADDR   E50DH   A   
+GPIFABORT. . . . .  X ADDR   E6F5H   A   
+GPIFADRH . . . . .  X ADDR   E6C4H   A   
+GPIFADRL . . . . .  X ADDR   E6C5H   A   
+GPIFCTLCFG . . . .  X ADDR   E6C3H   A   
+GPIFHOLDAMOUNT . .  X ADDR   E60CH   A   
+GPIFIDLECS . . . .  X ADDR   E6C1H   A   
+GPIFIDLECTL. . . .  X ADDR   E6C2H   A   
+GPIFIE . . . . . .  X ADDR   E660H   A   
+GPIFIRQ. . . . . .  X ADDR   E661H   A   
+A51 MACRO ASSEMBLER  LEDCYCLE                                                             06/13/2012 13:21:42 PAGE     6
+
+GPIFREADYCFG . . .  X ADDR   E6F3H   A   
+GPIFREADYSTAT. . .  X ADDR   E6F4H   A   
+GPIFSGLDATH. . . .  D ADDR   00BDH   A   
+GPIFSGLDATLNOX . .  D ADDR   00BFH   A   
+GPIFSGLDATLX . . .  D ADDR   00BEH   A   
+GPIFTCB0 . . . . .  X ADDR   E6D1H   A   
+GPIFTCB1 . . . . .  X ADDR   E6D0H   A   
+GPIFTCB2 . . . . .  X ADDR   E6CFH   A   
+GPIFTCB3 . . . . .  X ADDR   E6CEH   A   
+GPIFTRIG . . . . .  D ADDR   00BBH   A   
+GPIFWFSELECT . . .  X ADDR   E6C0H   A   
+GPIF_WAVE_DATA . .  X ADDR   E400H   A   
+I2CS . . . . . . .  X ADDR   E678H   A   
+I2CTL. . . . . . .  X ADDR   E67AH   A   
+I2DAT. . . . . . .  X ADDR   E679H   A   
+IBNIE. . . . . . .  X ADDR   E658H   A   
+IBNIRQ . . . . . .  X ADDR   E659H   A   
+IE . . . . . . . .  D ADDR   00A8H   A   
+IE0. . . . . . . .  B ADDR   0088H.1 A   
+IE1. . . . . . . .  B ADDR   0088H.3 A   
+IFCONFIG . . . . .  X ADDR   E601H   A   
+INPKTEND . . . . .  X ADDR   E648H   A   
+INT2CLR. . . . . .  D ADDR   00A1H   A   
+INT2IVEC . . . . .  X ADDR   E666H   A   
+INT4CLR. . . . . .  D ADDR   00A2H   A   
+INT4IVEC . . . . .  X ADDR   E667H   A   
+INT6 . . . . . . .  B ADDR   00D8H.3 A   
+INTSETUP . . . . .  X ADDR   E668H   A   
+IOA. . . . . . . .  D ADDR   0080H   A   
+IOB. . . . . . . .  D ADDR   0090H   A   
+IOC. . . . . . . .  D ADDR   00A0H   A   
+IOD. . . . . . . .  D ADDR   00B0H   A   
+IOE. . . . . . . .  D ADDR   00B1H   A   
+IP . . . . . . . .  D ADDR   00B8H   A   
+IT0. . . . . . . .  B ADDR   0088H.0 A   
+IT1. . . . . . . .  B ADDR   0088H.2 A   
+LITEBITS . . . . .  D ADDR   0020H   A   
+LTH. . . . . . . .  C ADDR   1403H   A   
+MICROFRAME . . . .  X ADDR   E686H   A   
+MPAGE. . . . . . .  D ADDR   0092H   A   
+NAKIE. . . . . . .  X ADDR   E65AH   A   
+NAKIRQ . . . . . .  X ADDR   E65BH   A   
+OEA. . . . . . . .  D ADDR   00B2H   A   
+OEB. . . . . . . .  D ADDR   00B3H   A   
+OEC. . . . . . . .  D ADDR   00B4H   A   
+OED. . . . . . . .  D ADDR   00B5H   A   
+OEE. . . . . . . .  D ADDR   00B6H   A   
+OUTPKTEND. . . . .  X ADDR   E649H   A   
+OV . . . . . . . .  B ADDR   00D0H.2 A   
+P. . . . . . . . .  B ADDR   00D0H.0 A   
+PA0. . . . . . . .  B ADDR   0080H.0 A   
+PA1. . . . . . . .  B ADDR   0080H.1 A   
+PA2. . . . . . . .  B ADDR   0080H.2 A   
+PA3. . . . . . . .  B ADDR   0080H.3 A   
+PA4. . . . . . . .  B ADDR   0080H.4 A   
+PA5. . . . . . . .  B ADDR   0080H.5 A   
+PA6. . . . . . . .  B ADDR   0080H.6 A   
+PA7. . . . . . . .  B ADDR   0080H.7 A   
+PB0. . . . . . . .  B ADDR   0090H.0 A   
+PB1. . . . . . . .  B ADDR   0090H.1 A   
+PB2. . . . . . . .  B ADDR   0090H.2 A   
+PB3. . . . . . . .  B ADDR   0090H.3 A   
+PB4. . . . . . . .  B ADDR   0090H.4 A   
+PB5. . . . . . . .  B ADDR   0090H.5 A   
+PB6. . . . . . . .  B ADDR   0090H.6 A   
+PB7. . . . . . . .  B ADDR   0090H.7 A   
+A51 MACRO ASSEMBLER  LEDCYCLE                                                             06/13/2012 13:21:42 PAGE     7
+
+PC0. . . . . . . .  B ADDR   00A0H.0 A   
+PC1. . . . . . . .  B ADDR   00A0H.1 A   
+PC2. . . . . . . .  B ADDR   00A0H.2 A   
+PC3. . . . . . . .  B ADDR   00A0H.3 A   
+PC4. . . . . . . .  B ADDR   00A0H.4 A   
+PC5. . . . . . . .  B ADDR   00A0H.5 A   
+PC6. . . . . . . .  B ADDR   00A0H.6 A   
+PC7. . . . . . . .  B ADDR   00A0H.7 A   
+PCON . . . . . . .  D ADDR   0087H   A   
+PD0. . . . . . . .  B ADDR   00B0H.0 A   
+PD1. . . . . . . .  B ADDR   00B0H.1 A   
+PD2. . . . . . . .  B ADDR   00B0H.2 A   
+PD3. . . . . . . .  B ADDR   00B0H.3 A   
+PD4. . . . . . . .  B ADDR   00B0H.4 A   
+PD5. . . . . . . .  B ADDR   00B0H.5 A   
+PD6. . . . . . . .  B ADDR   00B0H.6 A   
+PD7. . . . . . . .  B ADDR   00B0H.7 A   
+PI2C . . . . . . .  B ADDR   00F8H.1 A   
+PINFLAGSAB . . . .  X ADDR   E602H   A   
+PINFLAGSCD . . . .  X ADDR   E603H   A   
+PORTACFG . . . . .  X ADDR   E670H   A   
+PORTCCFG . . . . .  X ADDR   E671H   A   
+PORTECFG . . . . .  X ADDR   E672H   A   
+PORTIO . . . . . .  N NUMB   -----       
+PS0. . . . . . . .  B ADDR   00B8H.4 A   
+PS1. . . . . . . .  B ADDR   00B8H.6 A   
+PSW. . . . . . . .  D ADDR   00D0H   A   
+PT0. . . . . . . .  B ADDR   00B8H.1 A   
+PT1. . . . . . . .  B ADDR   00B8H.3 A   
+PT2. . . . . . . .  B ADDR   00B8H.5 A   
+PUSB . . . . . . .  B ADDR   00F8H.0 A   
+PX0. . . . . . . .  B ADDR   00B8H.0 A   
+PX1. . . . . . . .  B ADDR   00B8H.2 A   
+RB8. . . . . . . .  B ADDR   0098H.2 A   
+RB81 . . . . . . .  B ADDR   00C0H.2 A   
+RCAP2H . . . . . .  D ADDR   00CBH   A   
+RCAP2L . . . . . .  D ADDR   00CAH   A   
+RCLK . . . . . . .  B ADDR   00C8H.5 A   
+REN. . . . . . . .  B ADDR   0098H.4 A   
+REN1 . . . . . . .  B ADDR   00C0H.4 A   
+RESI . . . . . . .  B ADDR   00D8H.4 A   
+RES_WAVEDATA_END .  X ADDR   E480H   A   
+REVCTL . . . . . .  X ADDR   E60BH   A   
+REVID. . . . . . .  X ADDR   E60AH   A   
+RI . . . . . . . .  B ADDR   0098H.0 A   
+RI1. . . . . . . .  B ADDR   00C0H.0 A   
+RS0. . . . . . . .  B ADDR   00D0H.3 A   
+RS1. . . . . . . .  B ADDR   00D0H.4 A   
+SBUF0. . . . . . .  D ADDR   0099H   A   
+SBUF1. . . . . . .  D ADDR   00C1H   A   
+SCON0. . . . . . .  D ADDR   0098H   A   
+SCON1. . . . . . .  D ADDR   00C0H   A   
+SETUPDAT . . . . .  X ADDR   E6B8H   A   
+SM0. . . . . . . .  B ADDR   0098H.7 A   
+SM01 . . . . . . .  B ADDR   00C0H.7 A   
+SM1. . . . . . . .  B ADDR   0098H.6 A   
+SM11 . . . . . . .  B ADDR   00C0H.6 A   
+SM2. . . . . . . .  B ADDR   0098H.5 A   
+SM21 . . . . . . .  B ADDR   00C0H.5 A   
+SMOD1. . . . . . .  B ADDR   00D8H.7 A   
+SP . . . . . . . .  D ADDR   0081H   A   
+STACK. . . . . . .  I ADDR   0060H   A   
+START. . . . . . .  C ADDR   1400H   A   
+SUDPTRCTL. . . . .  X ADDR   E6B5H   A   
+SUDPTRH. . . . . .  X ADDR   E6B3H   A   
+SUDPTRL. . . . . .  X ADDR   E6B4H   A   
+A51 MACRO ASSEMBLER  LEDCYCLE                                                             06/13/2012 13:21:42 PAGE     8
+
+SUSPEND. . . . . .  X ADDR   E681H   A   
+T2CON. . . . . . .  D ADDR   00C8H   A   
+TB8. . . . . . . .  B ADDR   0098H.3 A   
+TB81 . . . . . . .  B ADDR   00C0H.3 A   
+TCLK . . . . . . .  B ADDR   00C8H.4 A   
+TCON . . . . . . .  D ADDR   0088H   A   
+TESTCFG. . . . . .  X ADDR   E6F9H   A   
+TF0. . . . . . . .  B ADDR   0088H.5 A   
+TF1. . . . . . . .  B ADDR   0088H.7 A   
+TF2. . . . . . . .  B ADDR   00C8H.7 A   
+TH0. . . . . . . .  D ADDR   008CH   A   
+TH1. . . . . . . .  D ADDR   008DH   A   
+TH2. . . . . . . .  D ADDR   00CDH   A   
+TI . . . . . . . .  B ADDR   0098H.1 A   
+TI1. . . . . . . .  B ADDR   00C0H.1 A   
+TL0. . . . . . . .  D ADDR   008AH   A   
+TL1. . . . . . . .  D ADDR   008BH   A   
+TL2. . . . . . . .  D ADDR   00CCH   A   
+TMOD . . . . . . .  D ADDR   0089H   A   
+TOGCTL . . . . . .  X ADDR   E683H   A   
+TR0. . . . . . . .  B ADDR   0088H.4 A   
+TR1. . . . . . . .  B ADDR   0088H.6 A   
+TR2. . . . . . . .  B ADDR   00C8H.2 A   
+UART230. . . . . .  X ADDR   E608H   A   
+UDMACRCH . . . . .  X ADDR   E67DH   A   
+UDMACRCL . . . . .  X ADDR   E67EH   A   
+UDMACRCQUAL. . . .  X ADDR   E67FH   A   
+USBCS. . . . . . .  X ADDR   E680H   A   
+USBERRIE . . . . .  X ADDR   E662H   A   
+USBERRIRQ. . . . .  X ADDR   E663H   A   
+USBFRAMEH. . . . .  X ADDR   E684H   A   
+USBFRAMEL. . . . .  X ADDR   E685H   A   
+USBIE. . . . . . .  X ADDR   E65CH   A   
+USBIRQ . . . . . .  X ADDR   E65DH   A   
+USBTEST. . . . . .  X ADDR   E6FAH   A   
+WAKEUPCS . . . . .  X ADDR   E682H   A   
+XGPIFSGLDATH . . .  X ADDR   E6F0H   A   
+XGPIFSGLDATLNOX. .  X ADDR   E6F2H   A   
+XGPIFSGLDATLX. . .  X ADDR   E6F1H   A   
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)

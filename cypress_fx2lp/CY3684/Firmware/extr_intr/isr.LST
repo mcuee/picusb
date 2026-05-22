@@ -1,0 +1,91 @@
+C51 COMPILER V7.06   ISR                                                                   06/13/2012 13:36:22 PAGE 1   
+
+
+C51 COMPILER V7.06, COMPILATION OF MODULE ISR
+OBJECT MODULE PLACED IN isr.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE isr.c BROWSE DEBUG OBJECTEXTEND
+
+stmt level    source
+
+   1          #include <stdio.h>
+   2          #include "fx2.h"
+   3          #include "fx2regs.h"
+   4          xdata volatile unsigned char D2ON         _at_ 0x8800;
+   5          xdata volatile unsigned char D2OFF        _at_ 0x8000;
+   6          xdata volatile unsigned char D3ON         _at_ 0x9800;
+   7          xdata volatile unsigned char D3OFF        _at_ 0x9000;
+   8          xdata volatile unsigned char D4ON         _at_ 0xA800;
+   9          xdata volatile unsigned char D4OFF        _at_ 0xA000;
+  10          xdata volatile unsigned char D5ON         _at_ 0xB800;
+  11          xdata volatile unsigned char D5OFF        _at_ 0xB000;
+  12          
+  13           unsigned char dum;
+  14           static int w;
+  15           static int x;
+  16           static int y;
+  17           static int z;
+  18          //interrupt 0 ,interrupt 1 , interrupt 10, interrupt 11 , interrupt 12 tells the compiler to look for the 
+             -ISR at address 0x0003,0x0013,
+  19          //0x0053 ,0x005B,0x0063 respectively . The numbers 10,11 ,12 are derived from the natural priority of the 
+             -interrupt for INT4/5/6 .
+  20          //Numbers 0 and 1 are (natural priority -1).
+  21          
+  22          
+  23          void ISR_EXTR0(void) interrupt 0                           
+  24          { 
+  25   1        TCON &= 0xFD;         // Clear INT0  TCON.1 Flag . This is also automatically cleared by hardware.
+  26   1        IOC ^= 0x01;              // Toggle pin 0 of PortC
+  27   1      
+  28   1        dum=D2ON;
+  29   1        w^=1;
+  30   1        if (w)
+  31   1        {dum=D2OFF;}
+  32   1      }
+  33          void ISR_EXTR1(void) interrupt 2
+  34          { 
+  35   1        TCON &= 0xF7;         // Clear INT1  TCON.3 Flag . This is also automatically cleared by hardware. 
+  36   1        IOC ^= 0x02;              // Toggle pin 1 of PortC
+  37   1        dum=D3ON;
+  38   1        x^=1;
+  39   1        if (x)
+  40   1        {dum=D3OFF;}
+  41   1       }
+  42          void ISR_EXTR4(void) interrupt 10
+  43          {
+  44   1              EXIF &= 0xBF;      // Clear INT4 EXIF.6  Flag
+  45   1              IOC ^= 0x10;       // Toggle pin 4 of PortC
+  46   1                dum=D4ON;
+  47   1        y^=1;
+  48   1        if (y)
+  49   1        {dum=D4OFF;}
+  50   1      }
+  51          void ISR_EXTR5(void) interrupt 11
+  52          {
+  53   1          EXIF &= 0x7F;      // Clear INT5 EXIF.7  Flag
+C51 COMPILER V7.06   ISR                                                                   06/13/2012 13:36:22 PAGE 2   
+
+  54   1              IOC ^= 0x20;       // Toggle pin 5 of PortC
+  55   1                dum=D5ON;
+  56   1        z^=1;
+  57   1        if (z)
+  58   1        {dum=D5OFF;}
+  59   1      }
+  60          void ISR_EXTR6(void) interrupt 12
+  61          {
+  62   1         EICON &= 0xF7;      // Clear INT6 EICON.3  Flag
+  63   1         IOC  ^= 0x40;           // Toggle pin 6  of PortC
+  64   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    167    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      9    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

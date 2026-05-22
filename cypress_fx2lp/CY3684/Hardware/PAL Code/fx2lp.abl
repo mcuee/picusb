@@ -1,0 +1,98 @@
+MODULE fx2lp
+
+" Swapped dipswitch settings 00 and 10 on 4-3-98 to allow the all-switch-on default
+
+	x,c,z	= .X.,.C.,.Z.;
+
+"Inputs
+	A12,A13,A14,A15					pin 11,12,13,16;
+	A11									pin 4;
+	nRD,nPSEN,nRD				   pin 6,5,2;
+	mm1,mm0								pin 9,7;
+"Outputs
+	EA,nRAMOE,nRAMCE					pin 21,25,27;
+	PF0,PF1,PF2,PF3					pin 17,18,19,20 istype 'reg_sr';
+
+modesw = [mm1,mm0];							" two dipswitches
+addr = [A15,A14,A13,A12,A11,nRD];		" high nibble of the address bus + RD
+
+equations
+" The 3681 board turns PF0 on at 0x80xx reads and off at 0x81xx reads.  
+" This board turns PF0 on at 0x8xxx reads and off at 0x88xx reads.
+PF0.S = (addr == ^b100000);
+PF0.R = (addr == ^b100010);
+PF0.CLK = CLKOUT;
+
+PF1.S = (addr == ^b100100);
+PF1.R = (addr == ^b100110);
+PF1.CLK = CLKOUT;
+
+PF2.S = (addr == ^b101000);
+PF2.R = (addr == ^b101010);
+PF2.CLK = CLKOUT;
+
+PF3.S = (addr == ^b101100);
+PF3.R = (addr == ^b101110);
+PF3.CLK = CLKOUT;
+
+WHEN 		(modesw == 00) THEN	" No external memory	
+{
+nRAMCE 	= 	1;
+nRAMOE	=	1;
+EA	=	0;
+}
+ELSE WHEN	(modesw == 01) THEN	" Ext P&D mem at 8000 (can add mem to 0-8K)
+{
+!nRAMCE	=	A15;
+!nRAMOE	=	!nRD # !nPSEN;		" Combine program & data memory
+EA	=	0;
+}
+ELSE WHEN	(modesw == 11) THEN	" Ext P&D mem at 0000 and 8000
+{
+!nRAMCE = 1;
+!nRAMOE	=	!nRD # !nPSEN;
+EA	=	0;
+}
+ELSE WHEN	(modesw == 10) THEN	" All program mem external
+{
+!nRAMCE = 1;
+!nRAMOE =	!nRD # !nPSEN;
+EA	=	1;
+}
+
+test_vectors
+
+([mm1,mm0,A15,nRD,nPSEN] -> [nRAMCE, nRAMOE, EA])
+ [ 0 , 0 , x , x ,  x  ] -> [ 1  ,  1 ,  0];	" 10: all mem selects and strobes OFF
+
+ [ 0 , 1 , 0 , 1 ,  1  ] -> [ 1  ,  1 ,  0];	" 01: top of mem for rd or psen
+ [ 0 , 1 , 1 , 1 ,  0  ] -> [ 0  ,  0 ,  0];	" PSEN only
+ [ 0 , 1 , 1 , 0 ,  1  ] -> [ 0  ,  0 ,  0];	" RD only
+ [ 0 , 1 , 1 , 1 ,  1  ] -> [ 0  ,  1 ,  0];	" Neither RD or PSEN
+
+ [ 1 , 1 , 0 , 1 ,  0  ] -> [ 0  ,  0 ,  0];	" 11: top and bot mem for rd or psen
+ [ 1 , 1 , 0 , 0 ,  1  ] -> [ 0  ,  0 ,  0];
+ [ 1 , 1 , 0 , 1 ,  1  ] -> [ 0  ,  1 ,  0];
+ [ 1 , 1 , 1 , 1 ,  0  ] -> [ 1  ,  0 ,  0];	" PSEN
+ [ 1 , 1 , 1 , 0 ,  1  ] -> [ 1  ,  0 ,  0];	" RD
+ [ 1 , 1 , 1 , 1 ,  1  ] -> [ 1  ,  1 ,  0];	" neither
+
+ [ 1 , 0 , 1 , 1 ,  0  ] -> [ 1  ,  0 ,  1];	" PSEN
+ [ 1 , 0 , 1 , 0 ,  1  ] -> [ 1  ,  0 ,  1];	" RD
+ [ 1 , 0 , 1 , 1 ,  1  ] -> [ 1  ,  1 ,  1];	" neither
+
+test_vectors
+
+([nRD,nPSEN] -> [nRAMOE])
+ [ 0 , 0   ] -> [ 0  ];
+ [ 0 , 1   ] -> [ 0  ];
+ [ 1 , 0   ] -> [ 0  ];
+ [ 1 , 1   ] -> [ 1  ];
+
+ test_vectors
+ (addr -> [PF0, PF1, PF2, PF3])
+ [1,0,0,0,0,0] -> [0, 0, 0, 0];
+ [1,0,0,0,1,0] -> [1, 0, 0, 0];
+
+END 
+

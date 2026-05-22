@@ -1,0 +1,40 @@
+### uVision2 Project, (C) Keil Software
+### Do not modify !
+
+ cExt (*.c)
+ aExt (*.a*; *.src)
+ oExt (*.obj)
+ lExt (*.lib)
+ tExt (*.txt)
+ pExt (*.plm)
+ CppX (*.cpp)
+ DaveTm { 0,0,0,0,0,0,0,0 }
+
+Target (Target 1), 0x0000 // Tools: 'MCS-51'
+GRPOPT 1,(Source Group 1),1,0,0
+
+OPTFFF 1,1,1,1,0,163,170,0,<.\MEMTEST.C><MEMTEST.C> { 44,0,0,0,0,0,0,0,1,0,0,0,255,255,255,255,255,255,255,255,252,255,255,255,226,255,255,255,0,0,0,0,0,0,0,0,234,3,0,0,16,1,0,0 }
+OPTFFF 1,2,4,0,0,0,0,0,<..\..\Target\Lib\LP\EZUSB.LIB><EZUSB.LIB> 
+
+ExtF <..\..\TARGET\INC\FX2.H> 1,1,0,{ 44,0,0,0,0,0,0,0,1,0,0,0,255,255,255,255,255,255,255,255,252,255,255,255,226,255,255,255,22,0,0,0,29,0,0,0,238,3,0,0,98,1,0,0 }
+ExtF <..\..\TARGET\INC\FX2REGS.H> 1,1,0,{ 44,0,0,0,2,0,0,0,3,0,0,0,255,255,255,255,255,255,255,255,252,255,255,255,226,255,255,255,44,0,0,0,58,0,0,0,4,4,0,0,127,1,0,0 }
+
+TARGOPT 1, (Target 1)
+ CLK51=48000000
+  OPTTT 1,0,1,0
+  OPTHX 0,65535,0,0,0
+  OPTLX 120,65,8,<.\>
+  OPTOX 16
+  OPTLT 1,1,1,0,1,1,0,1,1,0,0,0
+  OPTXL 1,1,1,1,1,1,1,0,0
+  OPTFL 1,0,1
+  OPTBL 0,(Add on databooks)<DATASHTS\ADDBOOKS.PDF>
+  OPTBL 1,(MCS 51 Instruction Set)<DATASHTS\ANCHOR\ISM51.PDF>
+  OPTDL (S8051.DLL)()(DP51.DLL)(-p52)(S8051.DLL)()(TP51.DLL)(-p52)
+  OPTDBG 49150,0,()()()()()()()()()() ()()()()
+  OPTKEY 0,(MON51)(-S2 -B38400 -O16)
+  OPTDF 0x84
+  OPTLE <>
+  OPTLC <>
+EndOpt
+

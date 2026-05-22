@@ -1,0 +1,595 @@
+C51 COMPILER V7.20   BULKLOOP                                                              05/17/2023 13:44:43 PAGE 1   
+
+
+C51 COMPILER V7.20, COMPILATION OF MODULE BULKLOOP
+OBJECT MODULE PLACED IN bulkloop.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE bulkloop.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          //-----------------------------------------------------------------------------
+   2          //   File:      bulkloop.c
+   3          //   Contents:  Hooks required to implement USB peripheral function.
+   4          //
+   5          // $Archive: /USB/Examples/FX2LP/bulkloop/bulkloop.c $
+   6          // $Date: 3/23/05 2:55p $
+   7          // $Revision: 4 $
+   8          //
+   9          //-----------------------------------------------------------------------------
+  10          // Copyright 2013, Cypress Semiconductor Corporation
+  11          //-----------------------------------------------------------------------------
+  12          //
+  13          //Project Objective
+  14          //      This project illustrates the configuration of the FX2LP to accept bulk data from 
+  15          //      the host and loop it back to the host
+  16          //
+  17          //Overview
+  18          //      This project demonstrates a bulkloop operation using the FX2LP. The project 
+  19          //      illustrates the configuration of the endpoints and the interface to carry out 
+  20          //      the bulkloop operation. Two endpoints are configured to handle bulk transfer, 
+  21          //      one OUT endpoint and one IN endpoint. Data sent from the host is stored in an 
+  22          //      OUT endpoint. This data is transferred to the IN endpoint and then sent back to 
+  23          //      the host on request. 
+  24          //
+  25          //Operation:
+  26          //      The descriptor file for this project defines two endpoints to the host. 
+  27          //      BULK Endpoint 2-OUT receives host data.
+  28          //      BULK Endpoint 6-IN sends the same data back to the host.
+  29          //      These endpoints are configured in TD_Init using the EP2CFG and EP6CFG registers.
+  30          //  Both endpoints are set for double-buffering, using two 1024-byte FIFOS. 
+  31          //      The IFCONFIG register is not written, so it uses the default 8051 PORTS mode.
+  32          //
+  33          //      Once configured, the OUT endpoints are "armed" to accept data from the host. 
+  34          //      An OUT endpoint is said to be armed if it is ready to accept data from the host. 
+  35          //      Each endpoint is configured as double buffered. 
+  36          //
+  37          //      The function TD_Poll is where the bulkloop operation takes place.
+  38          //
+  39          //      If data is available with endpoint 2 and if endpoint 6 is ready to accept 
+  40          //      new data, the data is transferred to endpoint 6 and it is committed by writing
+  41          //  the number of bytes to the byte count registers. Endpoint 2 is then rearmed to 
+  42          //      accept a new packet from the host
+  43          //
+  44          //Code Snippets:
+  45          //
+  46          //      Descriptor:
+  47          //          The interface descriptor defines the number of endpoints to the host. 
+  48          //              The two BULK endpoint descriptors report EP2-OUT and EP6-IN for the host. 
+  49          //              The maximum packet size is reported as 512 bytes. 
+  50          //              Descriptors are included for both high-speed and full-speed configurations. 
+  51          //
+  52          //      Initialization:
+  53          //              FX2LP is initialized in the TD_Init function, which is called once at startup.
+  54          //              The two endpoints defined in the descriptor file are be configured using these statements:
+  55          //
+C51 COMPILER V7.20   BULKLOOP                                                              05/17/2023 13:44:43 PAGE 2   
+
+  56          //              EP2CFG = 0xA2;  // EP2 is BULK-OUT, double-buffered
+  57          //              SYNCDELAY;                    
+  58          //              EP6CFG = 0xE2;  // EP6 is BULK-IN, double-buffered      
+  59          //              SYNCDELAY;                    
+  60          //              
+  61          //              Writing to these registers typically takes more than 2 clock cycles needed for a MOVX instruction. 
+  62          //              Hence the SYNCDELAY macro is used. The list of registers which need this delay 
+  63          //              function when writing to it is given in the TRM
+  64          //
+  65          //              The OUT endpoints, once configured, need to be armed to accept packets from the host. 
+  66          //              Since they are double buffered, they need to be armed by writing their byte count twice. 
+  67          //
+  68          //              By writing a 1 to bit7 of the byte count register the packet is made available to the 8051
+  69          //              instead of automatically routing it to the output FIFO. This is called a "skip".  
+  70          // 
+  71          //              EP2BCL = 0x80;                // arm EP2OUT by writing byte count w/skip.
+  72          //              SYNCDELAY;                    
+  73          //              EP2BCL = 0x80;
+  74          //              SYNCDELAY;                    
+  75          //
+  76          //              AUTOPTRSETUP |= 0x01;
+  77          //              This enables the AUTO pointer used for data transfer in the TD_Poll function. 
+  78          //
+  79          //      Enumeration:
+  80          //              Every time the FX2LP receives a setup command request, an interrupt is triggered where the 
+  81          //              GotSUD flag is asserted. The Setup Command function services various set up requests from the host. 
+  82          //              The Set up Command is executed through a switch case where the information desired by 
+  83          //              the host is serviced.     
+  84          //              Summing up, the enumeration process is done by repeated calling of the function SetupCommand().
+  85          //
+  86          //      Bulk Loop Implementation:
+  87          //              The bulk loop implementation is carried out in the TD_Poll function which is called repeatedly 
+  88          //              during device operation. 
+  89          //
+  90          //              Endpoint 2 is armed to accept data from the host. This data is transferred to endpoint 6.
+  91          //      To implement this, first, endpoint 2 is checked if it has data. 
+  92          //              This is done by reading the endpoint 2 empty bit in the endpoint status register (EP2468STAT). 
+  93          //              If endpoint 2 has data (that is sent from the host), the capability of endpoint 6 to receive 
+  94          //              the data is checked. This is done by reading the endpoint 6 Full bit in the endpoint status register. 
+  95          //              If endpoint 6 is not full, then the data is transferred.
+  96          //
+  97          //
+  98          //              Data Transfer implementation:
+  99          //                      The data pointers are initialized to the corresponding buffers.
+ 100          //                      The first auto-pointer is initialized to the first byte of the endpoint 2 FIFO buffer. 
+ 101          //                      The second auto-pointer is initialized to the first byte of the endpoint 6 FIFO buffer. 
+ 102          //                      
+ 103          //                      The number of bytes to be transferred is read from the byte count registers of Endpoint 2.
+ 104          //                      The registers EP2BCL, EP2BCH contain the number of bytes written into the FIFO buffer 
+ 105          //                      by the host. These two registers give the byte count of the data transferred to the FIFO 
+ 106          //                      in an OUT transaction as long as the data is not committed to the peripheral side (Skip bit set). 
+ 107          //
+ 108          //                      This data pointer initialization and loading of the count is done in the following statements. 
+ 109          //                      APTR1H = MSB( &EP2FIFOBUF );    // Initializing the first data pointer
+ 110          //                      APTR1L = LSB( &EP2FIFOBUF );
+ 111          //
+ 112          //                      AUTOPTRH2 = MSB( &EP6FIFOBUF ); // Initializing the second data pointer        
+ 113          //                      AUTOPTRL2 = LSB( &EP6FIFOBUF );
+ 114          //
+ 115          //                      count = (EP2BCH << 8) + EP2BCL; // The count value is loaded from the byte 
+ 116          //                                                      // count registers
+ 117          //
+C51 COMPILER V7.20   BULKLOOP                                                              05/17/2023 13:44:43 PAGE 3   
+
+ 118          //                      The data transfer is carried out by the execution of the loop below. 
+ 119          //
+ 120          //                      for( i = 0x0000; i < count; i++ )
+ 121          //                  {
+ 122          //                         // setup to transfer EP2OUT buffer to EP6IN buffer using AUTOPOINTER(s)
+ 123          //                         EXTAUTODAT2 = EXTAUTODAT1;
+ 124          //                  }
+ 125          //
+ 126          //                      As auto pointers have been enabled, the pointers increment automatically, and the statement 
+ 127          //
+ 128          //                      EXTAUTODAT2 = EXTAUTODAT1;
+ 129          //
+ 130          //                      transfers data from endpoint 2 to endpoint 6. Each time the above statement is executed 
+ 131          //                      each auto pointer is incremented. The above statement repeatedly executes to 
+ 132          //                      transfer each byte from endpoint 2 to 6. 
+ 133          //                      Once the data is transferred, endpoint 2 has to be "re-armed" to accept a new packet from the host. 
+ 134          //                      Endpoint 6 has to be "committed", that is, make the FIFO buffers available to the host for reading 
+ 135          //                      data from the Endpoint 6.
+ 136          //
+ 137          //                      This is accomplished by the following statements. 
+ 138          //
+ 139          //                      EP6BCH = EP2BCH;  
+ 140          //                      SYNCDELAY;  
+ 141          //                      EP6BCL = EP2BCL;        // commit EP6IN by specifying the number of bytes the host can read from EP6
+ 142          //                      SYNCDELAY;                    
+ 143          //                      EP2BCL = 0x80;          // arm EP2OUT w. SKIP bit set.
+ 144          //
+ 145          //----------------------------------------------------------------------------
+ 146          // Code below
+ 147          //----------------------------------------------------------------------------
+ 148          
+ 149          #pragma NOIV               // Do not generate interrupt vectors
+ 150          
+ 151          #include "fx2.h"
+ 152          #include "fx2regs.h"
+ 153          #include "syncdly.h"            // SYNCDELAY macro
+ 154          
+ 155          extern BOOL GotSUD;             // Received setup data flag
+ 156          extern BOOL Sleep;
+ 157          extern BOOL Rwuen;
+ 158          extern BOOL Selfpwr;
+ 159          
+ 160          BYTE Configuration;             // Current configuration
+ 161          BYTE AlternateSetting;          // Alternate settings
+ 162          
+ 163          int start_7_seg_display = 0;  //This variable is used to start 7-seg display after the FX2LP is enumerated
+             -.
+ 164          void EZUSB_INITI2C();
+ 165          
+ 166          #define VR_NAKALL_ON    0xD0
+ 167          #define VR_NAKALL_OFF   0xD1
+ 168          #define bmEP2IRQ                0x10
+ 169          #define bmEP6IRQ                0x40    
+ 170          // 7-segment readout
+ 171          #define LED_ADDR                0x21
+ 172          
+ 173          // Provide access to FX2LP DVK LED's D2-D5. An LED is turned 
+ 174          // on or off by doing a read to one of these memory addresses.  
+ 175          xdata volatile BYTE D5OFF _at_ 0xB000;
+ 176          xdata volatile BYTE D4OFF _at_ 0xA000;
+ 177          xdata volatile BYTE D3OFF _at_ 0x9000;
+ 178          xdata volatile BYTE D2OFF _at_ 0x8000;
+C51 COMPILER V7.20   BULKLOOP                                                              05/17/2023 13:44:43 PAGE 4   
+
+ 179          xdata volatile BYTE D5ON  _at_ 0xB800;
+ 180          xdata volatile BYTE D4ON  _at_ 0xA800;
+ 181          xdata volatile BYTE D3ON  _at_ 0x9800;
+ 182          xdata volatile BYTE D2ON  _at_ 0x8800;
+ 183          
+ 184          int LEDCounter = 0;                     // Activity LED blink period
+ 185          BYTE inblink = 0x00;            // IN transfer LED time constant
+ 186          BYTE outblink = 0x00;           // OUT transfer LED time constant
+ 187          
+ 188          // 7-segment readout digits 0-F 
+ 189          BYTE xdata Digit[] = { 0xc0, 0xf9, 0xa4, 0xb0, 0x99, 0x92, 0x82, 0xf8, 0x80, 0x98, 0x88, 0x83, 0xc6, 0xa1,
+             - 0x86, 0x8e };
+ 190          
+ 191          //-----------------------------------------------------------------------------
+ 192          // Task Dispatcher hooks
+ 193          //   The following hooks are called by the task dispatcher.
+ 194          //-----------------------------------------------------------------------------
+ 195          
+ 196          void TD_Init(void)             // Called once at startup
+ 197          {
+ 198   1         BYTE dum;                                    // For the LEDS
+ 199   1         CPUCS = ((CPUCS & ~bmCLKSPD) | bmCLKSPD1) ;  // 48 MHz CPU clock
+ 200   1         
+ 201   1         
+ 202   1         // Turn off all 4 LEDS
+ 203   1         dum = D2OFF;
+ 204   1         dum = D3OFF;
+ 205   1         dum = D4OFF;
+ 206   1         dum = D5OFF;
+ 207   1      
+ 208   1      // EP2CFG & EP6CFG configure our two endpoints, EP2-OUT and EP6-IN
+ 209   1      // b7:          Valid
+ 210   1      // b6:          DIR (0=OUT, 1=IN)
+ 211   1      // b[5:4]       Type (01=ISO, 10=BULK, 11=INT)
+ 212   1      // b3:          Size (0=512, 1=1024 bytes)
+ 213   1      // b2:          0
+ 214   1      // b[1:0]       Buffering (00=quad, 10=double, 11=triple)               
+ 215   1      //
+ 216   1      
+ 217   1        EP2CFG = 0xA2;        // Valid, BULK-OUT, 512 byte buffer, double-buffered
+ 218   1        SYNCDELAY;            // Some regs take longer to update, see TRM Section 15.14.                    
+ 219   1        EP6CFG = 0xE2;        // Valid, BULK-IN, 512 byte buffer, double-buffered
+ 220   1        SYNCDELAY;                    
+ 221   1      
+ 222   1        // OUT endpoints do not come up armed
+ 223   1        // Since the endpoint is double buffered we must write dummy byte counts twice
+ 224   1        EP2BCL = 0x80;        // arm EP2OUT by writing byte count w/skip.
+ 225   1        SYNCDELAY;                    
+ 226   1        EP2BCL = 0x80;        // again
+ 227   1        SYNCDELAY;                    
+ 228   1        // enable dual autopointer feature
+ 229   1        AUTOPTRSETUP |= 0x01;
+ 230   1      
+ 231   1        USBIE |= bmSOF;                               // Enable the SOF IRQ to serve as LED timers
+ 232   1        EPIE = bmEP6IRQ | bmEP2IRQ;   // Enable EP6 and EP2 Interrupts to turn on transfer LEDS
+ 233   1      }
+ 234          
+ 235          void TD_Poll(void)              // Called repeatedly while the device is idle
+ 236          {
+ 237   1        WORD i;
+ 238   1        WORD count;
+ 239   1      //  BYTE dummy_LED2;            // ***For the LED
+C51 COMPILER V7.20   BULKLOOP                                                              05/17/2023 13:44:43 PAGE 5   
+
+ 240   1        BYTE waiting_inpkts;
+ 241   1      
+ 242   1      #ifdef ENABLE_7_SEG_DISPLAY
+              if(start_7_seg_display)
+              {
+              // update 7-seg readout with number of IN packets waiting for transfer to the host
+                waiting_inpkts = (EP6CS & 0xF0)>>4;
+                EZUSB_WriteI2C(LED_ADDR, 0x01, &(Digit[waiting_inpkts]));
+                EZUSB_WaitForEEPROMWrite(LED_ADDR);
+              }
+              #endif
+ 251   1      
+ 252   1      // Transfer EP6-OUT buffer to EP2-IN buffer when there is a packet in one of the EP6-OUT buffers, AND
+ 253   1      // there is an available EP2-IN buffer. The FIFO status flags update after full packets are transferred.
+ 254   1      // Therefore EP2-OUT "Not Empty" means a packet is available, and "EP6-IN "Not Full" means there is an
+ 255   1      // available buffer. Using the flags this way handles any packet size and takes multiple buffering
+ 256   1      // into account.   
+ 257   1      
+ 258   1              if(!(EP2468STAT & bmEP2EMPTY))          // Is EP2-OUT buffer not empty (has at least one packet)?
+ 259   1              {
+ 260   2                      if(!(EP2468STAT & bmEP6FULL))   // YES: Is EP6-IN buffer not full (room for at least 1 pkt)?
+ 261   2              { 
+ 262   3              APTR1H = MSB( &EP2FIFOBUF );
+ 263   3              APTR1L = LSB( &EP2FIFOBUF );
+ 264   3              AUTOPTRH2 = MSB( &EP6FIFOBUF );
+ 265   3              AUTOPTRL2 = LSB( &EP6FIFOBUF );
+ 266   3      
+ 267   3              count = (EP2BCH << 8) + EP2BCL;
+ 268   3      
+ 269   3              // loop EP2OUT buffer data to EP6IN
+ 270   3              for( i = 0; i < count; i++ )
+ 271   3              {
+ 272   4                  EXTAUTODAT2 = EXTAUTODAT1;  // Autopointers make block transfers easy...
+ 273   4              }
+ 274   3              EP6BCH = EP2BCH;                // Send the same number of bytes as received  
+ 275   3              SYNCDELAY;  
+ 276   3              EP6BCL = EP2BCL;        // arm EP6IN
+ 277   3              SYNCDELAY;                    
+ 278   3              EP2BCL = 0x80;          // arm EP2OUT
+ 279   3           }
+ 280   2        }
+ 281   1      }
+*** WARNING C280 IN LINE 240 OF BULKLOOP.C: 'waiting_inpkts': unreferenced local variable
+ 282          
+ 283          BOOL TD_Suspend(void)          // Called before the device goes into suspend mode
+ 284          {
+ 285   1         return(TRUE);
+ 286   1      }
+ 287          
+ 288          BOOL TD_Resume(void)          // Called after the device resumes
+ 289          {
+ 290   1         return(TRUE);
+ 291   1      }
+ 292          
+ 293          //-----------------------------------------------------------------------------
+ 294          // Device Request hooks
+ 295          //   The following hooks are called by the end point 0 device request parser.
+ 296          //-----------------------------------------------------------------------------
+ 297          
+ 298          BOOL DR_GetDescriptor(void)
+ 299          {
+ 300   1         return(TRUE);
+C51 COMPILER V7.20   BULKLOOP                                                              05/17/2023 13:44:43 PAGE 6   
+
+ 301   1      }
+ 302          
+ 303          BOOL DR_SetConfiguration(void)   // Called when a Set Configuration command is received
+ 304          {
+ 305   1         Configuration = SETUPDAT[2];
+ 306   1      #ifdef ENABLE_7_SEG_DISPLAY
+              
+                EZUSB_INITI2C();                              // for the 7-seg readout
+                start_7_seg_display = 1;
+              
+              #endif
+ 312   1         return(TRUE);            // Handled by user code
+ 313   1      }
+ 314          
+ 315          BOOL DR_GetConfiguration(void)   // Called when a Get Configuration command is received
+ 316          {
+ 317   1         EP0BUF[0] = Configuration;
+ 318   1         EP0BCH = 0;
+ 319   1         EP0BCL = 1;
+ 320   1         return(TRUE);            // Handled by user code
+ 321   1      }
+ 322          
+ 323          BOOL DR_SetInterface(void)       // Called when a Set Interface command is received
+ 324          {
+ 325   1         AlternateSetting = SETUPDAT[2];
+ 326   1         return(TRUE);            // Handled by user code
+ 327   1      }
+ 328          
+ 329          BOOL DR_GetInterface(void)       // Called when a Set Interface command is received
+ 330          {
+ 331   1         EP0BUF[0] = AlternateSetting;
+ 332   1         EP0BCH = 0;
+ 333   1         EP0BCL = 1;
+ 334   1         return(TRUE);            // Handled by user code
+ 335   1      }
+ 336          
+ 337          BOOL DR_GetStatus(void)
+ 338          {
+ 339   1         return(TRUE);
+ 340   1      }
+ 341          
+ 342          BOOL DR_ClearFeature(void)
+ 343          {
+ 344   1         return(TRUE);
+ 345   1      }
+ 346          
+ 347          BOOL DR_SetFeature(void)
+ 348          {
+ 349   1         return(TRUE);
+ 350   1      }
+ 351          
+ 352          BOOL DR_VendorCmnd(void)
+ 353          {
+ 354   1        return(TRUE);
+ 355   1      }
+ 356          
+ 357          //-----------------------------------------------------------------------------
+ 358          // USB Interrupt Handlers
+ 359          //   The following functions are called by the USB interrupt jump table.
+ 360          //-----------------------------------------------------------------------------
+ 361          
+ 362          // Setup Data Available Interrupt Handler
+C51 COMPILER V7.20   BULKLOOP                                                              05/17/2023 13:44:43 PAGE 7   
+
+ 363          void ISR_Sudav(void) interrupt 0
+ 364          {
+ 365   1         GotSUD = TRUE;            // Set flag
+ 366   1         EZUSB_IRQ_CLEAR();
+ 367   1         USBIRQ = bmSUDAV;         // Clear SUDAV IRQ
+ 368   1      }
+ 369          
+ 370          // Setup Token Interrupt Handler
+ 371          void ISR_Sutok(void) interrupt 0
+ 372          {
+ 373   1         EZUSB_IRQ_CLEAR();
+ 374   1         USBIRQ = bmSUTOK;         // Clear SUTOK IRQ
+ 375   1      }
+ 376          
+ 377          void ISR_Sof(void) interrupt 0
+ 378          {
+ 379   1         BYTE dum;
+ 380   1         BYTE Led_Flag = 0;
+ 381   1         EZUSB_IRQ_CLEAR();
+ 382   1         USBIRQ = bmSOF;              // Clear SOF IRQ
+ 383   1      
+ 384   1              if(--inblink == 0)                      // IN and OUT LED extinguishers
+ 385   1                      dum = D2OFF;
+ 386   1              if(--outblink == 0)     
+ 387   1                      dum = D3OFF;
+ 388   1      
+ 389   1         // *** Blink the LED with one second period. At High-Speed the
+ 390   1         // microSOF's occur every 125 usec. Flash the LED 8 times per sec for High-Speed,
+ 391   1         // 1 per sec for Full-Speed. 
+ 392   1      
+ 393   1         LEDCounter++;
+ 394   1         if(LEDCounter > 1000)
+ 395   1              LEDCounter = 0;         // 1 sec period
+ 396   1                      if(LEDCounter < 500)
+ 397   1                              dum = D5OFF;
+ 398   1                      else
+ 399   1                              dum = D5ON;
+ 400   1      }
+ 401          
+ 402          void ISR_Ures(void) interrupt 0
+ 403          {
+ 404   1         // whenever we get a USB reset, we should revert to full speed mode
+ 405   1         pConfigDscr = pFullSpeedConfigDscr;
+ 406   1         ((CONFIGDSCR xdata *) pConfigDscr)->type = CONFIG_DSCR;
+ 407   1         pOtherConfigDscr = pHighSpeedConfigDscr;
+ 408   1         ((CONFIGDSCR xdata *) pOtherConfigDscr)->type = OTHERSPEED_DSCR;
+ 409   1      
+ 410   1         EZUSB_IRQ_CLEAR();
+ 411   1         USBIRQ = bmURES;         // Clear URES IRQ
+ 412   1      }
+ 413          
+ 414          void ISR_Susp(void) interrupt 0
+ 415          {
+ 416   1         Sleep = TRUE;
+ 417   1         EZUSB_IRQ_CLEAR();
+ 418   1         USBIRQ = bmSUSP;
+ 419   1      }
+ 420          
+ 421          void ISR_Highspeed(void) interrupt 0
+ 422          {
+ 423   1         if (EZUSB_HIGHSPEED())
+ 424   1         {
+C51 COMPILER V7.20   BULKLOOP                                                              05/17/2023 13:44:43 PAGE 8   
+
+ 425   2            pConfigDscr = pHighSpeedConfigDscr;
+ 426   2            ((CONFIGDSCR xdata *) pConfigDscr)->type = CONFIG_DSCR;
+ 427   2            pOtherConfigDscr = pFullSpeedConfigDscr;
+ 428   2            ((CONFIGDSCR xdata *) pOtherConfigDscr)->type = OTHERSPEED_DSCR;
+ 429   2         }
+ 430   1      
+ 431   1         EZUSB_IRQ_CLEAR();
+ 432   1         USBIRQ = bmHSGRANT;
+ 433   1      }
+ 434          void ISR_Ep0ack(void) interrupt 0
+ 435          {
+ 436   1      }
+ 437          void ISR_Stub(void) interrupt 0
+ 438          {
+ 439   1      }
+ 440          void ISR_Ep0in(void) interrupt 0
+ 441          {
+ 442   1      }
+ 443          void ISR_Ep0out(void) interrupt 0
+ 444          {
+ 445   1      }
+ 446          void ISR_Ep1in(void) interrupt 0
+ 447          {
+ 448   1      }
+ 449          void ISR_Ep1out(void) interrupt 0
+ 450          {
+ 451   1      }
+ 452          void ISR_Ep2inout(void) interrupt 0
+ 453          {
+ 454   1              BYTE dum;       
+ 455   1              EZUSB_IRQ_CLEAR();
+ 456   1              EPIRQ = bmEP2IRQ;         // Clear IRQ
+ 457   1              dum = D3ON;
+ 458   1              outblink = 200;
+ 459   1      }
+ 460          void ISR_Ep4inout(void) interrupt 0
+ 461          {
+ 462   1      }
+ 463          void ISR_Ep6inout(void) interrupt 0
+ 464          {
+ 465   1              BYTE dum;
+ 466   1              EZUSB_IRQ_CLEAR();
+ 467   1              EPIRQ = bmEP6IRQ;         // Clear IRQ  dum = D2OFF;
+ 468   1              dum = D2ON;
+ 469   1              inblink = 200;
+ 470   1      }
+ 471          void ISR_Ep8inout(void) interrupt 0
+ 472          {
+ 473   1      }
+ 474          void ISR_Ibn(void) interrupt 0
+ 475          {
+ 476   1      }
+ 477          void ISR_Ep0pingnak(void) interrupt 0
+ 478          {
+ 479   1      }
+ 480          void ISR_Ep1pingnak(void) interrupt 0
+ 481          {
+ 482   1      }
+ 483          void ISR_Ep2pingnak(void) interrupt 0
+ 484          {
+ 485   1      }
+ 486          void ISR_Ep4pingnak(void) interrupt 0
+C51 COMPILER V7.20   BULKLOOP                                                              05/17/2023 13:44:43 PAGE 9   
+
+ 487          {
+ 488   1      }
+ 489          void ISR_Ep6pingnak(void) interrupt 0
+ 490          {
+ 491   1      }
+ 492          void ISR_Ep8pingnak(void) interrupt 0
+ 493          {
+ 494   1      }
+ 495          void ISR_Errorlimit(void) interrupt 0
+ 496          {
+ 497   1      }
+ 498          void ISR_Ep2piderror(void) interrupt 0
+ 499          {
+ 500   1      }
+ 501          void ISR_Ep4piderror(void) interrupt 0
+ 502          {
+ 503   1      }
+ 504          void ISR_Ep6piderror(void) interrupt 0
+ 505          {
+ 506   1      }
+ 507          void ISR_Ep8piderror(void) interrupt 0
+ 508          {
+ 509   1      }
+ 510          void ISR_Ep2pflag(void) interrupt 0
+ 511          {
+ 512   1      }
+ 513          void ISR_Ep4pflag(void) interrupt 0
+ 514          {
+ 515   1      }
+ 516          void ISR_Ep6pflag(void) interrupt 0
+ 517          {
+ 518   1      }
+ 519          void ISR_Ep8pflag(void) interrupt 0
+ 520          {
+ 521   1      }
+ 522          void ISR_Ep2eflag(void) interrupt 0
+ 523          {
+ 524   1      }
+ 525          void ISR_Ep4eflag(void) interrupt 0
+ 526          {
+ 527   1      }
+ 528          void ISR_Ep6eflag(void) interrupt 0
+ 529          {
+ 530   1      }
+ 531          void ISR_Ep8eflag(void) interrupt 0
+ 532          {
+ 533   1      }
+ 534          void ISR_Ep2fflag(void) interrupt 0
+ 535          {
+ 536   1      }
+ 537          void ISR_Ep4fflag(void) interrupt 0
+ 538          {
+ 539   1      }
+ 540          void ISR_Ep6fflag(void) interrupt 0
+ 541          {
+ 542   1      }
+ 543          void ISR_Ep8fflag(void) interrupt 0
+ 544          {
+ 545   1      }
+ 546          void ISR_GpifComplete(void) interrupt 0
+ 547          {
+ 548   1      }
+C51 COMPILER V7.20   BULKLOOP                                                              05/17/2023 13:44:43 PAGE 10  
+
+ 549          void ISR_GpifWaveform(void) interrupt 0
+ 550          {
+ 551   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    615    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     16    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      8       4
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,9 @@
+"fw.obj",
+"bulksrc.obj",
+"dscr.obj",
+"..\..\Target\Lib\LP\USBJmpTb.OBJ",
+"..\..\Target\Lib\LP\EZUSB.LIB" 
+TO "bulksrc" 
+RAMSIZE(256) 
+CODE( 0x80 )
+XDATA( 0x1000 )

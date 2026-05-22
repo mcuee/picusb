@@ -1,0 +1,9 @@
+"pingnak.obj",
+"fw.obj",
+"dscr.obj",
+"..\..\Target\Lib\LP\USBJmpTb.OBJ",
+"..\..\Target\Lib\LP\EZUSB.LIB" 
+TO "pingnak" 
+RAMSIZE(256) 
+CODE( 0x80-0x0FFF )
+XDATA( 0x1000 )

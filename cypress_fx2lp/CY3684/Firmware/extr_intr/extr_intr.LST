@@ -1,0 +1,629 @@
+C51 COMPILER V7.06   EXTR_INTR                                                             03/25/2012 06:55:21 PAGE 1   
+
+
+C51 COMPILER V7.06, COMPILATION OF MODULE EXTR_INTR
+OBJECT MODULE PLACED IN extr_intr.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE extr_intr.c BROWSE DEBUG OBJECTEXTEND
+
+stmt level    source
+
+   1          //--------------------------------------------------------------------------
+   2          //
+   3          // Copyright 2008, Cypress Semiconductor Corporation.
+   4          //
+   5          // This software is owned by Cypress Semiconductor Corporation (Cypress)
+   6          // and is protected by and subject to worldwide patent protection (United
+   7          // States and foreign), United States copyright laws and international
+   8          // treaty provisions. Cypress hereby grants to licensee a personal,
+   9          // non-exclusive, non-transferable license to copy, use, modify, create
+  10          // derivative works of, and compile the Cypress Source Code and derivative
+  11          // works for the sole purpose of creating custom software in support of
+  12          // licensee product to be used only in conjunction with a Cypress integrated
+  13          // circuit as specified in the applicable agreement. Any reproduction,
+  14          // modification, translation, compilation, or representation of this
+  15          // software except as specified above is prohibited without the express
+  16          // written permission of Cypress.
+  17          //
+  18          // Disclaimer: CYPRESS MAKES NO WARRANTY OF ANY KIND,EXPRESS OR IMPLIED,
+  19          // WITH REGARD TO THIS MATERIAL, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+  20          // WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+  21          // Cypress reserves the right to make changes without further notice to the
+  22          // materials described herein. Cypress does not assume any liability arising
+  23          // out of the application or use of any product or circuit described herein.
+  24          // Cypress does not authorize its products for use as critical components in
+  25          // life-support systems where a malfunction or failure may reasonably be
+  26          // expected to result in significant injury to the user. The inclusion of
+  27          // Cypress' product in a life-support systems application implies that the
+  28          // manufacturer assumes all risk of such use and in doing so indemnifies
+  29          // Cypress against all charges.
+  30          //
+  31          // Use may be limited by and subject to the applicable Cypress software
+  32          // license agreement.
+  33          //
+  34          //--------------------------------------------------------------------------
+  35          //*****************************************************************************
+  36          //*****************************************************************************
+  37          //  FILENAME: extr_intr.c
+  38          //   Version: 1.0, Updated on 04 Jan 2010
+  39          //
+  40          //  DESCRIPTION: External Interrupt in FX1/FX2LP.
+  41          //
+  42          //-----------------------------------------------------------------------------
+  43          //  Copyright (c) Cypress MicroSystems 2000-2003. All Rights Reserved.
+  44          //*****************************************************************************
+  45          //*****************************************************************************
+  46          //*****************************************************************************
+  47          
+  48          
+  49          //Project Objective:
+  50          //      The objective of this project is to demonstrate the usage of External interrupts in FX2LP, by providing
+             - frameworks based 
+  51          //      External interrupt program written in C. 
+  52          
+  53          //Overview:
+  54          //      The FX2LP has 5 external interrupts: IE0, IE1, IE4, IE5, and IE6. IE0, IE1 are either Edge triggered or
+C51 COMPILER V7.06   EXTR_INTR                                                             03/25/2012 06:55:21 PAGE 2   
+
+             - level triggered and 
+  55          //      IE4, IE5, IE6 are edge triggered interrupts. In the project, Port C has been configured as an output po
+             -rt. When an INT0 interrupt occurs, 
+  56          //      PC.0 is toggled. Similarly, on INT1 /INT4/INT5/INT6, PC.1 /PC.4/PC.5/PC.6 are toggled. The code for tog
+             -gling the Port C pins is written 
+  57          //      inside for the Interrupt Service Routine [ISR] for these interrupts, in the isr.c file.
+  58          //
+  59          //Operations:
+  60          //      Refer to the document External_Interrupt.doc
+  61          //
+  62          //-------------------------------------------------------------------------------------------
+  63          // Code below
+  64          //-------------------------------------------------------------------------------------------
+  65          
+  66          // Do not generate interrupt vectors
+  67          #pragma NOIV               
+  68          //-----------------------------------------------------------------------------
+  69          //   File:       Fx2_extr_intr.c
+  70          //   Contents:   Hooks required to implement USB peripheral function.
+  71          //   Copyright (c) 2000 Cypress Semiconductor All rights reserved
+  72          //-----------------------------------------------------------------------------
+  73          #include "fx2.h"
+  74          #include "fx2regs.h"
+  75          #include "syncdly.h"            // SYNCDELAY macro
+  76          
+  77          extern BOOL GotSUD;             // Received setup data flag
+  78          extern BOOL Sleep;
+  79          extern BOOL Rwuen;
+  80          extern BOOL Selfpwr;
+  81          
+  82          BYTE Configuration;             // Current configuration
+  83          BYTE AlternateSetting;          // Alternate settings
+  84          BYTE IbnFlag;
+  85          
+  86          #define VR_NAKALL_ON    0xD0
+  87          #define VR_NAKALL_OFF   0xD1
+  88          #define VR_IMT4_TRIGGER   0xD2
+  89          
+  90          //-----------------------------------------------------------------------------
+  91          // Task Dispatcher hooks
+  92          // The following hooks are called by the task dispatcher.
+  93          //-----------------------------------------------------------------------------
+  94          
+  95          void TD_Init(void)             // Called once at startup              
+  96          {
+  97   1         CPUCS = ((CPUCS & ~bmCLKSPD) | bmCLKSPD1) ;
+  98   1      
+  99   1         // set the slave FIFO interface to 48MHz
+ 100   1         IFCONFIG |= 0x40;
+ 101   1      
+ 102   1        // Registers which require a synchronization delay, see section 15.14
+ 103   1        // FIFORESET        FIFOPINPOLAR
+ 104   1        // INPKTEND         OUTPKTEND
+ 105   1        // EPxBCH:L         REVCTL
+ 106   1        // GPIFTCB3         GPIFTCB2
+ 107   1        // GPIFTCB1         GPIFTCB0
+ 108   1        // EPxFIFOPFH:L     EPxAUTOINLENH:L
+ 109   1        // EPxFIFOCFG       EPxGPIFFLGSEL
+ 110   1        // PINFLAGSxx       EPxFIFOIRQ
+ 111   1        // EPxFIFOIE        GPIFIRQ
+ 112   1        // GPIFIE           GPIFADRH:L
+ 113   1        // UDMACRCH:L       EPxGPIFTRIG
+C51 COMPILER V7.06   EXTR_INTR                                                             03/25/2012 06:55:21 PAGE 3   
+
+ 114   1        // GPIFTRIG
+ 115   1        
+ 116   1        // Note: The pre-REVE EPxGPIFTCH/L register are affected, as well...
+ 117   1        //      ...these have been replaced by GPIFTC[B3:B0] registers
+ 118   1      
+ 119   1        // default: all endpoints have their VALID bit set
+ 120   1        // default: TYPE1 = 1 and TYPE0 = 0 --> BULK  
+ 121   1        // default: EP2 and EP4 DIR bits are 0 (OUT direction)
+ 122   1        // default: EP6 and EP8 DIR bits are 1 (IN direction)
+ 123   1        // default: EP2, EP4, EP6, and EP8 are double buffered
+ 124   1      
+ 125   1        // we are just using the default values, yes this is not necessary...
+ 126   1        EP1OUTCFG = 0xA0;
+ 127   1        EP1INCFG = 0xA0;
+ 128   1        SYNCDELAY;                    // see TRM section 15.14
+ 129   1        EP2CFG = 0xA2;
+ 130   1        SYNCDELAY;                    
+ 131   1        EP4CFG = 0xA0;
+ 132   1        SYNCDELAY;                    
+ 133   1        EP6CFG = 0xE2;
+ 134   1        SYNCDELAY;                    
+ 135   1        EP8CFG = 0xE0;
+ 136   1      
+ 137   1        // out endpoints do not come up armed.  Arm EP1, EP2 and EP4 OUT  endpoints
+ 138   1         EP1OUTBC = 0x40;                             // arm the EP1 OUT endpoint by writing to the byte count
+ 139   1        // since the defaults are double buffered we must write dummy byte counts twice
+ 140   1        SYNCDELAY;                    
+ 141   1        EP2BCL = 0x80;                // arm EP2OUT by writing byte count w/skip.
+ 142   1        SYNCDELAY;                    
+ 143   1        EP2BCL = 0x80;
+ 144   1        SYNCDELAY;                    
+ 145   1        EP4BCL = 0x80;                // arm EP4OUT by writing byte count w/skip.
+ 146   1        SYNCDELAY;                    
+ 147   1        EP4BCL = 0x80;    
+ 148   1      
+ 149   1       
+ 150   1        
+ 151   1        
+ 152   1       /************************************Endpoint Interrupt*******************************************/
+ 153   1      
+ 154   1      EPIE |= bmBIT3 ; // Enable EP1 OUT Endpoint interrupts
+ 155   1      EPIE |= bmBIT2; // Enable  EP1 IN  Endpoint interrupts
+ 156   1        
+ 157   1        // enable dual autopointer feature
+ 158   1        
+ 159   1        AUTOPTRSETUP |= 0x01;
+ 160   1      
+ 161   1        Rwuen = TRUE;                 // Enable remote-wakeup
+ 162   1      // Configure  for  external interrupts
+ 163   1      /************************************************************External Interrupt***************************
+             -/
+ 164   1              PORTCCFG = 0x00;            // PORTC is is configured as an I/O, alternately it can output the lower addr
+             -ess of enabled GPIF address pins
+ 165   1              OEC  = 0xFF;                // PORTC is an output
+ 166   1              IOC = 0xFF;                 // Initialize PORTC to all LOW
+ 167   1      
+ 168   1      //INT0# and INT1#
+ 169   1      
+ 170   1              PORTACFG = 0x03;            // PA0 and PA1 are pins for INT0 and INT1 respectively.
+ 171   1              TCON |= 0x05;               // INT0 and INT1 are configured as Edge triggered interrupts. 
+ 172   1      
+ 173   1      //INT4
+C51 COMPILER V7.06   EXTR_INTR                                                             03/25/2012 06:55:21 PAGE 4   
+
+ 174   1      
+ 175   1              INTSETUP &= ~0x02;          // If INTSETUP.1=0,then INT4 is supplied by the pin.Else, the interrupt is su
+             -pplied internally FIFO/GPIF sources.
+ 176   1      
+ 177   1      //INT5#  is a dedicated  pin , available in the 100 amd 128 pin packages.
+ 178   1      
+ 179   1      //INT6# 
+ 180   1      
+ 181   1              PORTECFG = 0x20;            // PE5  is  INT6 
+ 182   1              OEE &= ~0x20;
+ 183   1              
+ 184   1      //Enable  External Interrupts
+ 185   1              EIE |= 0x1C;                    // Enable External Interrupts 4, 5 and 6
+ 186   1          IE  |= 0x05;                            // Enable External Interrupts 0 and 1       
+ 187   1              
+ 188   1      //Clear  Flags
+ 189   1          EXIF &= 0xBF;                       // Clear INT4 EXIF.6  Flag
+ 190   1              EXIF &= 0x7F;                           // Clear INT5 EXIF.7  Flag
+ 191   1              EICON &= 0xF7;                  // Clear INT6 EICON.3  Flag
+ 192   1              EA   = 1;                                   // Enable Global Interrupt
+ 193   1         /*********************************************IBN******************************************************
+             -*******/
+ 194   1           NAKIRQ = bmBIT0;              // clear the global IBN IRQ
+ 195   1        NAKIE |= bmBIT0;              // enable the global IBN IRQ
+ 196   1      
+ 197   1        IbnFlag = 0x00;               // clear our IBN flag
+ 198   1        IBNIRQ = 0xFF;                // clear any pending IBN IRQ
+ 199   1        IBNIE |= bmEP6IBN | bmEP8IBN; // enable the IBN interrupt for EP6 and EP8
+ 200   1         NAKIRQ |= ~bmIBN;                   // clear any pending PING-NAK IRQ
+ 201   1         /********************PING******************************************************************************
+             -*****/
+ 202   1        NAKIE |=  bmEP4PING;     // enable the PING-NAK interrupt for EP2 and EP4
+ 203   1      }
+ 204          
+ 205          
+ 206          void TD_Poll(void)              // Called repeatedly while the device is idle
+ 207          {   
+ 208   1        WORD i;
+ 209   1        WORD count;
+ 210   1          INTSETUP &= ~bmAV4EN;     // Disable INT4 autovectoring so that we use  the external INT4
+ 211   1      if(!(EP2468STAT & bmEP4EMPTY))
+ 212   1        { // check EP4 EMPTY(busy) bit in EP2468STAT (SFR), core set's this bit when FIFO is empty
+ 213   2           if(!(EP2468STAT & bmEP8FULL))
+ 214   2           {  // check EP8 FULL(busy) bit in EP2468STAT (SFR), core set's this bit when FIFO is full
+ 215   3              APTR1H = MSB( &EP4FIFOBUF );
+ 216   3              APTR1L = LSB( &EP4FIFOBUF );
+ 217   3      
+ 218   3              AUTOPTRH2 = MSB( &EP8FIFOBUF );
+ 219   3              AUTOPTRL2 = LSB( &EP8FIFOBUF );
+ 220   3      
+ 221   3              count = (EP4BCH << 8) + EP4BCL;
+ 222   3      
+ 223   3              // loop EP4OUT buffer data to EP8IN
+ 224   3              for( i = 0x0000; i < count; i++ )
+ 225   3              {
+ 226   4                 // setup to transfer EP4OUT buffer to EP8IN buffer using AUTOPOINTER(s)
+ 227   4                 EXTAUTODAT2 = EXTAUTODAT1;
+ 228   4              }
+ 229   3              
+ 230   3              EP8BCH = EP4BCH;  
+ 231   3              SYNCDELAY;  
+ 232   3              EP8BCL = EP4BCL;        // arm EP8IN
+C51 COMPILER V7.06   EXTR_INTR                                                             03/25/2012 06:55:21 PAGE 5   
+
+ 233   3              SYNCDELAY;                    
+ 234   3              EP4BCL = 0x80;          // re(arm) EP4OUT
+ 235   3           }
+ 236   2        }
+ 237   1      }
+ 238          
+ 239          BOOL TD_Suspend(void)          // Called before the device goes into suspend mode
+ 240          {
+ 241   1         return(TRUE);
+ 242   1      }
+ 243          
+ 244          BOOL TD_Resume(void)          // Called after the device resumes
+ 245          {
+ 246   1         return(TRUE);
+ 247   1      }
+ 248          
+ 249          //-----------------------------------------------------------------------------
+ 250          // Device Request hooks
+ 251          //   The following hooks are called by the end point 0 device request parser.
+ 252          //-----------------------------------------------------------------------------
+ 253          
+ 254          BOOL DR_GetDescriptor(void)
+ 255          {
+ 256   1         return(TRUE);
+ 257   1      }
+ 258          
+ 259          BOOL DR_SetConfiguration(void)   // Called when a Set Configuration command is received
+ 260          {
+ 261   1         Configuration = SETUPDAT[2];
+ 262   1         return(TRUE);            // Handled by user code
+ 263   1      }
+ 264          
+ 265          BOOL DR_GetConfiguration(void)   // Called when a Get Configuration command is received
+ 266          {
+ 267   1         EP0BUF[0] = Configuration;
+ 268   1         EP0BCH = 0;
+ 269   1         EP0BCL = 1;
+ 270   1         return(TRUE);            // Handled by user code
+ 271   1      }
+ 272          
+ 273          BOOL DR_SetInterface(void)       // Called when a Set Interface command is received
+ 274          {
+ 275   1         AlternateSetting = SETUPDAT[2];
+ 276   1         return(TRUE);            // Handled by user code
+ 277   1      }
+ 278          
+ 279          BOOL DR_GetInterface(void)       // Called when a Set Interface command is received
+ 280          {
+ 281   1         EP0BUF[0] = AlternateSetting;
+ 282   1         EP0BCH = 0;
+ 283   1         EP0BCL = 1;
+ 284   1         return(TRUE);            // Handled by user code
+ 285   1      }
+ 286          
+ 287          BOOL DR_GetStatus(void)
+ 288          {
+ 289   1         return(TRUE);
+ 290   1      }
+ 291          
+ 292          BOOL DR_ClearFeature(void)
+ 293          {
+ 294   1         return(TRUE);
+C51 COMPILER V7.06   EXTR_INTR                                                             03/25/2012 06:55:21 PAGE 6   
+
+ 295   1      }
+ 296          
+ 297          BOOL DR_SetFeature(void)
+ 298          {
+ 299   1         return(TRUE);
+ 300   1      }
+ 301          
+ 302          BOOL DR_VendorCmnd(void)
+ 303          {
+ 304   1        BYTE tmp;
+ 305   1        
+ 306   1        switch (SETUPDAT[1])
+ 307   1        {
+ 308   2           case VR_NAKALL_ON:
+ 309   2              tmp = FIFORESET;
+ 310   2              tmp |= bmNAKALL;      
+ 311   2              SYNCDELAY;                    
+ 312   2              FIFORESET = tmp;
+ 313   2              break;
+ 314   2              case VR_IMT4_TRIGGER:
+ 315   2                              *EP0BUF = VR_IMT4_TRIGGER; // Fail
+ 316   2                              EP0BCH = 0;
+ 317   2                              EP0BCL = 1; // Arm endpoint with # bytes to transfer
+ 318   2                              EXIF |= 0x40;  //Trigger  external  interrupt in SW
+ 319   2                              break;
+ 320   2           case VR_NAKALL_OFF:
+ 321   2              tmp = FIFORESET;
+ 322   2              tmp &= ~bmNAKALL;      
+ 323   2              SYNCDELAY;                    
+ 324   2              FIFORESET = tmp;
+ 325   2              break;
+ 326   2           default:
+ 327   2              return(TRUE);
+ 328   2        }
+ 329   1      
+ 330   1        return(FALSE);
+ 331   1      }
+ 332          
+ 333          //-----------------------------------------------------------------------------
+ 334          // USB Interrupt Handlers
+ 335          //   The following functions are called by the USB interrupt jump table.
+ 336          //-----------------------------------------------------------------------------
+ 337          
+ 338          // Setup Data Available Interrupt Handler
+ 339          void ISR_Sudav(void) interrupt 0
+ 340          {
+ 341   1         GotSUD = TRUE;            // Set flag
+ 342   1         EZUSB_IRQ_CLEAR();
+ 343   1         USBIRQ = bmSUDAV;         // Clear SUDAV IRQ
+ 344   1      }
+ 345          
+ 346          // Setup Token Interrupt Handler
+ 347          void ISR_Sutok(void) interrupt 0
+ 348          {
+ 349   1         EZUSB_IRQ_CLEAR();
+ 350   1         USBIRQ = bmSUTOK;         // Clear SUTOK IRQ
+ 351   1      }
+ 352          
+ 353          void ISR_Sof(void) interrupt 0
+ 354          {
+ 355   1         EZUSB_IRQ_CLEAR();
+ 356   1         USBIRQ = bmSOF;            // Clear SOF IRQ
+C51 COMPILER V7.06   EXTR_INTR                                                             03/25/2012 06:55:21 PAGE 7   
+
+ 357   1      }
+ 358          
+ 359          void ISR_Ures(void) interrupt 0
+ 360          {
+ 361   1         // whenever we get a USB reset, we should revert to full speed mode
+ 362   1         pConfigDscr = pFullSpeedConfigDscr;
+ 363   1         ((CONFIGDSCR xdata *) pConfigDscr)->type = CONFIG_DSCR;
+ 364   1         pOtherConfigDscr = pHighSpeedConfigDscr;
+ 365   1         ((CONFIGDSCR xdata *) pOtherConfigDscr)->type = OTHERSPEED_DSCR;
+ 366   1      
+ 367   1         EZUSB_IRQ_CLEAR();
+ 368   1         USBIRQ = bmURES;         // Clear URES IRQ
+ 369   1      }
+ 370          
+ 371          void ISR_Susp(void) interrupt 0
+ 372          {
+ 373   1         Sleep = TRUE;
+ 374   1         EZUSB_IRQ_CLEAR();
+ 375   1         USBIRQ = bmSUSP;
+ 376   1      }
+ 377          
+ 378          void ISR_Highspeed(void) interrupt 0
+ 379          {
+ 380   1         if (EZUSB_HIGHSPEED())
+ 381   1         {
+ 382   2            pConfigDscr = pHighSpeedConfigDscr;
+ 383   2            ((CONFIGDSCR xdata *) pConfigDscr)->type = CONFIG_DSCR;
+ 384   2            pOtherConfigDscr = pFullSpeedConfigDscr;
+ 385   2            ((CONFIGDSCR xdata *) pOtherConfigDscr)->type = OTHERSPEED_DSCR;
+ 386   2         }
+ 387   1      
+ 388   1         EZUSB_IRQ_CLEAR();
+ 389   1         USBIRQ = bmHSGRANT;
+ 390   1      }
+ 391          void ISR_Ep0ack(void) interrupt 0
+ 392          {
+ 393   1      }
+ 394          void ISR_Stub(void) interrupt 0
+ 395          {
+ 396   1      }
+ 397          void ISR_Ep0in(void) interrupt 0
+ 398          {
+ 399   1      }
+ 400          void ISR_Ep0out(void) interrupt 0
+ 401          {
+ 402   1      }
+ 403          void ISR_Ep1in(void) interrupt 0
+ 404          {
+ 405   1              EP1OUTBC = 64;
+ 406   1      
+ 407   1              EZUSB_IRQ_CLEAR();
+ 408   1              EPIRQ = bmBIT2;
+ 409   1      }
+ 410          void ISR_Ep1out(void) interrupt 0
+ 411          {
+ 412   1      
+ 413   1              BYTE count;
+ 414   1              BYTE i;
+ 415   1              
+ 416   1              count = EP1OUTBC;
+ 417   1              if(!(EP1INCS & bmBIT1))
+ 418   1              {
+C51 COMPILER V7.06   EXTR_INTR                                                             03/25/2012 06:55:21 PAGE 8   
+
+ 419   2                      for (i=0;i<count; i++)
+ 420   2                      {
+ 421   3                              EP1INBUF[i]=EP1OUTBUF[i];
+ 422   3                      }
+ 423   2                      EP1INBC =count;
+ 424   2              }
+ 425   1      
+ 426   1              EZUSB_IRQ_CLEAR();
+ 427   1              EPIRQ = bmBIT3;
+ 428   1      }
+ 429          void ISR_Ep2inout(void) interrupt 0
+ 430          {
+ 431   1      }
+ 432          void ISR_Ep4inout(void) interrupt 0
+ 433          {
+ 434   1      }
+ 435          void ISR_Ep6inout(void) interrupt 0
+ 436          {
+ 437   1      }
+ 438          void ISR_Ep8inout(void) interrupt 0
+ 439          {
+ 440   1      }
+ 441          void ISR_Ibn(void) interrupt 0
+ 442          {
+ 443   1         int i;
+ 444   1         int byteCount;
+ 445   1         // disable IBN for all endpoints
+ 446   1         IBNIE = 0x00;
+ 447   1      
+ 448   1         EZUSB_IRQ_CLEAR();         // clear the global USB IRQ
+ 449   1      
+ 450   1         // Find the EP with its IBN bit set
+ 451   1         for (i=0;i<8;i++)
+ 452   1         {
+ 453   2            if (IBNIRQ & (1 << i))
+ 454   2            {
+ 455   3               IbnFlag |= (1 << i);       // set the appropriate IBN flag bit
+ 456   3               IBNIRQ |= (1 << i);        // clear the IBN IRQ for this endpoint
+ 457   3            }
+ 458   2         }
+ 459   1      
+ 460   1       
+ 461   1        // if there is new data in EP2FIFOBUF and the IBN flag for EP6 has been set, then copy
+ 462   1        // the data from EP2 to EP6
+ 463   1        if(!(EP2468STAT & bmEP2EMPTY) && (IbnFlag & bmEP6IBN) )
+ 464   1        {
+ 465   2           APTR1H = MSB( &EP2FIFOBUF );
+ 466   2           APTR1L = LSB( &EP2FIFOBUF );
+ 467   2      
+ 468   2           AUTOPTRH2 = MSB( &EP6FIFOBUF );
+ 469   2           AUTOPTRL2 = LSB( &EP6FIFOBUF );
+ 470   2      
+ 471   2           byteCount = (EP2BCH << 8) + EP2BCL;
+ 472   2      
+ 473   2           for( i = 0x0000; i < byteCount; i++ )
+ 474   2           {
+ 475   3              EXTAUTODAT2 = EXTAUTODAT1;
+ 476   3           }
+ 477   2      
+ 478   2           EP6BCH = EP2BCH;  
+ 479   2           SYNCDELAY;  
+ 480   2           EP6BCL = EP2BCL;           // arm EP6IN
+C51 COMPILER V7.06   EXTR_INTR                                                             03/25/2012 06:55:21 PAGE 9   
+
+ 481   2      
+ 482   2           IbnFlag &= ~bmEP6IBN;      // clear the IBN flag
+ 483   2           IBNIRQ = bmEP6IBN;         // clear the IBN IRQ
+ 484   2           IBNIE |= bmEP6IBN;         // enable the IBN IRQ
+ 485   2      
+ 486   2           SYNCDELAY;                        
+ 487   2           EP2BCL = 0x80;             // re(arm) EP2OUT
+ 488   2        }
+ 489   1      
+ 490   1        // if there is new data in EP4FIFOBUF and the IBN flag for EP8 has been set, then copy
+ 491   1        // the data from EP2 to EP6
+ 492   1        
+ 493   1        NAKIRQ |= bmBIT0;          // clear the global IBN IRQ
+ 494   1      
+ 495   1         // re-enable IBN interrupt for any endpoints that don't already have
+ 496   1         // an IBN pending in IbnFlag
+ 497   1         IBNIE = (bmEP6IBN | bmEP8IBN) & ~IbnFlag;
+ 498   1      }
+ 499          void ISR_Ep0pingnak(void) interrupt 0
+ 500          {
+ 501   1      }
+ 502          void ISR_Ep1pingnak(void) interrupt 0
+ 503          {
+ 504   1      }
+ 505          void ISR_Ep2pingnak(void) interrupt 0
+ 506          {
+ 507   1      }
+ 508          void ISR_Ep4pingnak(void) interrupt 0
+ 509          {
+ 510   1        // if we get a PING-NAK interrupt then arm the endpoint
+ 511   1         SYNCDELAY;                    
+ 512   1         EP4BCL = 0x80;
+ 513   1      
+ 514   1         EZUSB_IRQ_CLEAR();
+ 515   1         NAKIRQ = bmEP4PING;
+ 516   1      }
+ 517          void ISR_Ep6pingnak(void) interrupt 0
+ 518          {
+ 519   1      }
+ 520          void ISR_Ep8pingnak(void) interrupt 0
+ 521          {
+ 522   1      }
+ 523          void ISR_Errorlimit(void) interrupt 0
+ 524          {
+ 525   1      }
+ 526          void ISR_Ep2piderror(void) interrupt 0
+ 527          {
+ 528   1      }
+ 529          void ISR_Ep4piderror(void) interrupt 0
+ 530          {
+ 531   1      }
+ 532          void ISR_Ep6piderror(void) interrupt 0
+ 533          {
+ 534   1      }
+ 535          void ISR_Ep8piderror(void) interrupt 0
+ 536          {
+ 537   1      }
+ 538          void ISR_Ep2pflag(void) interrupt 0
+ 539          {
+ 540   1      }
+ 541          void ISR_Ep4pflag(void) interrupt 0
+ 542          {
+C51 COMPILER V7.06   EXTR_INTR                                                             03/25/2012 06:55:21 PAGE 10  
+
+ 543   1      }
+ 544          void ISR_Ep6pflag(void) interrupt 0
+ 545          {
+ 546   1      }
+ 547          void ISR_Ep8pflag(void) interrupt 0
+ 548          {
+ 549   1      }
+ 550          void ISR_Ep2eflag(void) interrupt 0
+ 551          {
+ 552   1      }
+ 553          void ISR_Ep4eflag(void) interrupt 0
+ 554          {
+ 555   1      }
+ 556          void ISR_Ep6eflag(void) interrupt 0
+ 557          {
+ 558   1      }
+ 559          void ISR_Ep8eflag(void) interrupt 0
+ 560          {
+ 561   1      }
+ 562          void ISR_Ep2fflag(void) interrupt 0
+ 563          {
+ 564   1      }
+ 565          void ISR_Ep4fflag(void) interrupt 0
+ 566          {
+ 567   1      }
+ 568          void ISR_Ep6fflag(void) interrupt 0
+ 569          {
+ 570   1      }
+ 571          void ISR_Ep8fflag(void) interrupt 0
+ 572          {
+ 573   1      }
+ 574          void ISR_GpifComplete(void) interrupt 0
+ 575          {
+ 576   1      }
+ 577          void ISR_GpifWaveform(void) interrupt 0
+ 578          {
+ 579   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1083    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      3    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

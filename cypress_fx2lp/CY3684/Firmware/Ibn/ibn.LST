@@ -1,0 +1,465 @@
+C51 COMPILER V7.06   IBN                                                                   06/13/2012 13:37:15 PAGE 1   
+
+
+C51 COMPILER V7.06, COMPILATION OF MODULE IBN
+OBJECT MODULE PLACED IN ibn.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ibn.c DEBUG OBJECTEXTEND
+
+stmt level    source
+
+   1          //-----------------------------------------------------------------------------
+   2          //   File:     ibn.c
+   3          // Contents:   firmware to perform bulk loopback of EP2OUT to EP6IN and
+   4          //             EP4OUT to EP8IN using the IBN (In Bulk Nak) interrupt
+   5          //             to initiate the transfer.
+   6          //
+   7          // $Archive: /USB/Examples/FX2LP/ibn/ibn.c $
+   8          // $Date: 3/23/05 2:59p $
+   9          // $Revision: 3 $
+  10          //
+  11          //
+  12          //-----------------------------------------------------------------------------
+  13          // Copyright 2003, Cypress Semiconductor Corporation
+  14          //-----------------------------------------------------------------------------
+  15          #pragma NOIV               // Do not generate interrupt vectors
+  16          
+  17          #include "fx2.h"
+  18          #include "fx2regs.h"
+  19          #include "syncdly.h"            // SYNCDELAY macro
+  20          
+  21          extern BOOL GotSUD;             // Received setup data flag
+  22          extern BOOL Sleep;
+  23          extern BOOL Rwuen;
+  24          extern BOOL Selfpwr;
+  25          
+  26          BYTE Configuration;             // Current configuration
+  27          BYTE AlternateSetting;          // Alternate settings
+  28          BYTE IbnFlag;
+  29          
+  30          //-----------------------------------------------------------------------------
+  31          // Task Dispatcher hooks
+  32          //   The following hooks are called by the task dispatcher.
+  33          //-----------------------------------------------------------------------------
+  34          
+  35          void TD_Init(void)              // Called once at startup
+  36          {
+  37   1        CPUCS = 0x10;                 // CLKSPD[1:0]=10, for 48MHz operation
+  38   1                                      // CLKOE=0, don't drive CLKOUT
+  39   1      
+  40   1        // Registers which require a synchronization delay, see section 15.14
+  41   1        // FIFORESET        FIFOPINPOLAR
+  42   1        // INPKTEND         OUTPKTEND
+  43   1        // EPxBCH:L         REVCTL
+  44   1        // GPIFTCB3         GPIFTCB2
+  45   1        // GPIFTCB1         GPIFTCB0
+  46   1        // EPxFIFOPFH:L     EPxAUTOINLENH:L
+  47   1        // EPxFIFOCFG       EPxGPIFFLGSEL
+  48   1        // PINFLAGSxx       EPxFIFOIRQ
+  49   1        // EPxFIFOIE        GPIFIRQ
+  50   1        // GPIFIE           GPIFADRH:L
+  51   1        // UDMACRCH:L       EPxGPIFTRIG
+  52   1        // GPIFTRIG
+  53   1        
+  54   1        // Note: The pre-REVE EPxGPIFTCH/L register are affected, as well...
+  55   1        //      ...these have been replaced by GPIFTC[B3:B0] registers
+C51 COMPILER V7.06   IBN                                                                   06/13/2012 13:37:15 PAGE 2   
+
+  56   1        
+  57   1        // default: all endpoints have their VALID bit set
+  58   1        // default: TYPE1 = 1 and TYPE0 = 0 --> BULK  
+  59   1        // default: EP2 and EP4 DIR bits are 0 (OUT direction)
+  60   1        // default: EP6 and EP8 DIR bits are 1 (IN direction)
+  61   1        // default: EP2, EP4, EP6, and EP8 are double buffered
+  62   1      
+  63   1        // we are just using the default values, yes this is not necessary...
+  64   1        EP1OUTCFG = 0xA0;
+  65   1        EP1INCFG = 0xA0;
+  66   1        SYNCDELAY;                    // see TRM section 15.14
+  67   1        EP2CFG = 0xA2;
+  68   1        SYNCDELAY;                    // 
+  69   1        EP4CFG = 0xA0;
+  70   1        SYNCDELAY;                    // 
+  71   1        EP6CFG = 0xE2;
+  72   1        SYNCDELAY;                    // 
+  73   1        EP8CFG = 0xE0;
+  74   1      
+  75   1        // out endpoints do not come up armed
+  76   1        
+  77   1        // since the defaults are double buffered we must write dummy byte counts twice
+  78   1        SYNCDELAY;                    // 
+  79   1        EP2BCL = 0x80;                // arm EP2OUT by writing byte count w/skip.
+  80   1        SYNCDELAY;                    // 
+  81   1        EP4BCL = 0x80;    
+  82   1        SYNCDELAY;                    // 
+  83   1        EP2BCL = 0x80;                // arm EP4OUT by writing byte count w/skip.
+  84   1        SYNCDELAY;                    // 
+  85   1        EP4BCL = 0x80;    
+  86   1      
+  87   1        NAKIRQ = bmBIT0;              // clear the global IBN IRQ
+  88   1        NAKIE |= bmBIT0;              // enable the global IBN IRQ
+  89   1      
+  90   1        IbnFlag = 0x00;               // clear our IBN flag
+  91   1        IBNIRQ = 0xFF;                // clear any pending IBN IRQ
+  92   1        IBNIE |= bmEP6IBN | bmEP8IBN; // enable the IBN interrupt for EP6 and EP8
+  93   1      
+  94   1        // enable dual autopointer feature
+  95   1        AUTOPTRSETUP |= 0x01;
+  96   1      
+  97   1      }
+  98          
+  99          void TD_Poll(void)              // Called repeatedly while the device is idle
+ 100          {
+ 101   1        int i;
+ 102   1        int byteCount;
+ 103   1      
+ 104   1        // if there is new data in EP2FIFOBUF and the IBN flag for EP6 has been set, then copy
+ 105   1        // the data from EP2 to EP6
+ 106   1        if(!(EP2468STAT & bmEP2EMPTY) && (IbnFlag & bmEP6IBN) )
+ 107   1        {
+ 108   2           APTR1H = MSB( &EP2FIFOBUF );
+ 109   2           APTR1L = LSB( &EP2FIFOBUF );
+ 110   2      
+ 111   2           AUTOPTRH2 = MSB( &EP6FIFOBUF );
+ 112   2           AUTOPTRL2 = LSB( &EP6FIFOBUF );
+ 113   2      
+ 114   2           byteCount = (EP2BCH << 8) + EP2BCL;
+ 115   2      
+ 116   2           for( i = 0x0000; i < byteCount; i++ )
+ 117   2           {
+C51 COMPILER V7.06   IBN                                                                   06/13/2012 13:37:15 PAGE 3   
+
+ 118   3              EXTAUTODAT2 = EXTAUTODAT1;
+ 119   3           }
+ 120   2      
+ 121   2           EP6BCH = EP2BCH;  
+ 122   2           SYNCDELAY;  
+ 123   2           EP6BCL = EP2BCL;           // arm EP6IN
+ 124   2      
+ 125   2           IbnFlag &= ~bmEP6IBN;      // clear the IBN flag
+ 126   2           IBNIRQ = bmEP6IBN;         // clear the IBN IRQ
+ 127   2           IBNIE |= bmEP6IBN;         // enable the IBN IRQ
+ 128   2      
+ 129   2           SYNCDELAY;                        
+ 130   2           EP2BCL = 0x80;             // re(arm) EP2OUT
+ 131   2        }
+ 132   1      
+ 133   1        // if there is new data in EP4FIFOBUF and the IBN flag for EP8 has been set, then copy
+ 134   1        // the data from EP2 to EP6
+ 135   1        if(!(EP2468STAT & bmEP4EMPTY) && (IbnFlag & bmEP8IBN) )
+ 136   1        {
+ 137   2           APTR1H = MSB( &EP4FIFOBUF );
+ 138   2           APTR1L = LSB( &EP4FIFOBUF );
+ 139   2      
+ 140   2           AUTOPTRH2 = MSB( &EP8FIFOBUF );
+ 141   2           AUTOPTRL2 = LSB( &EP8FIFOBUF );
+ 142   2      
+ 143   2           byteCount = (EP4BCH << 8) + EP4BCL;
+ 144   2      
+ 145   2           for( i = 0x0000; i < byteCount; i++ )
+ 146   2           {
+ 147   3              EXTAUTODAT2 = EXTAUTODAT1;
+ 148   3           }
+ 149   2      
+ 150   2           EP8BCH = EP4BCH;  
+ 151   2           SYNCDELAY;  
+ 152   2           EP8BCL = EP4BCL;           // arm EP8IN
+ 153   2      
+ 154   2           IbnFlag &= ~bmEP8IBN;      // clear the IBN flag
+ 155   2           IBNIRQ = bmEP8IBN;         // clear the IBN IRQ
+ 156   2           IBNIE |= bmEP8IBN;         // enable the IBN IRQ
+ 157   2      
+ 158   2           SYNCDELAY;                        
+ 159   2           EP4BCL = 0x80;             // re(arm) EP4OUT
+ 160   2        }
+ 161   1      
+ 162   1      }
+ 163          
+ 164          BOOL TD_Suspend(void)          // Called before the device goes into suspend mode
+ 165          {
+ 166   1         return(TRUE);
+ 167   1      }
+ 168          
+ 169          BOOL TD_Resume(void)          // Called after the device resumes
+ 170          {
+ 171   1         return(TRUE);
+ 172   1      }
+ 173          
+ 174          //-----------------------------------------------------------------------------
+ 175          // Device Request hooks
+ 176          //   The following hooks are called by the end point 0 device request parser.
+ 177          //-----------------------------------------------------------------------------
+ 178          
+ 179          BOOL DR_GetDescriptor(void)
+C51 COMPILER V7.06   IBN                                                                   06/13/2012 13:37:15 PAGE 4   
+
+ 180          {
+ 181   1         return(TRUE);
+ 182   1      }
+ 183          
+ 184          BOOL DR_SetConfiguration(void)   // Called when a Set Configuration command is received
+ 185          {
+ 186   1         Configuration = SETUPDAT[2];
+ 187   1         return(TRUE);            // Handled by user code
+ 188   1      }
+ 189          
+ 190          BOOL DR_GetConfiguration(void)   // Called when a Get Configuration command is received
+ 191          {
+ 192   1         EP0BUF[0] = Configuration;
+ 193   1         EP0BCH = 0;
+ 194   1         EP0BCL = 1;
+ 195   1         return(TRUE);            // Handled by user code
+ 196   1      }
+ 197          
+ 198          BOOL DR_SetInterface(void)       // Called when a Set Interface command is received
+ 199          {
+ 200   1         AlternateSetting = SETUPDAT[2];
+ 201   1         return(TRUE);            // Handled by user code
+ 202   1      }
+ 203          
+ 204          BOOL DR_GetInterface(void)       // Called when a Set Interface command is received
+ 205          {
+ 206   1         EP0BUF[0] = AlternateSetting;
+ 207   1         EP0BCH = 0;
+ 208   1         EP0BCL = 1;
+ 209   1         return(TRUE);            // Handled by user code
+ 210   1      }
+ 211          
+ 212          BOOL DR_GetStatus(void)
+ 213          {
+ 214   1         return(TRUE);
+ 215   1      }
+ 216          
+ 217          BOOL DR_ClearFeature(void)
+ 218          {
+ 219   1         return(TRUE);
+ 220   1      }
+ 221          
+ 222          BOOL DR_SetFeature(void)
+ 223          {
+ 224   1         return(TRUE);
+ 225   1      }
+ 226          
+ 227          BOOL DR_VendorCmnd(void)
+ 228          {
+ 229   1         return(TRUE);
+ 230   1      }
+ 231          
+ 232          //-----------------------------------------------------------------------------
+ 233          // USB Interrupt Handlers
+ 234          //   The following functions are called by the USB interrupt jump table.
+ 235          //-----------------------------------------------------------------------------
+ 236          
+ 237          // Setup Data Available Interrupt Handler
+ 238          void ISR_Sudav(void) interrupt 0
+ 239          {
+ 240   1         GotSUD = TRUE;            // Set flag
+ 241   1         EZUSB_IRQ_CLEAR();
+C51 COMPILER V7.06   IBN                                                                   06/13/2012 13:37:15 PAGE 5   
+
+ 242   1         USBIRQ = bmSUDAV;         // Clear SUDAV IRQ
+ 243   1      }
+ 244          
+ 245          // Setup Token Interrupt Handler
+ 246          void ISR_Sutok(void) interrupt 0
+ 247          {
+ 248   1         EZUSB_IRQ_CLEAR();
+ 249   1         USBIRQ = bmSUTOK;         // Clear SUTOK IRQ
+ 250   1      }
+ 251          
+ 252          void ISR_Sof(void) interrupt 0
+ 253          {
+ 254   1         EZUSB_IRQ_CLEAR();
+ 255   1         USBIRQ = bmSOF;            // Clear SOF IRQ
+ 256   1      }
+ 257          
+ 258          void ISR_Ures(void) interrupt 0
+ 259          {
+ 260   1         if (EZUSB_HIGHSPEED())
+ 261   1         {
+ 262   2            pConfigDscr = pHighSpeedConfigDscr;
+ 263   2            pOtherConfigDscr = pFullSpeedConfigDscr;
+ 264   2         }
+ 265   1         else
+ 266   1         {
+ 267   2            pConfigDscr = pFullSpeedConfigDscr;
+ 268   2            pOtherConfigDscr = pHighSpeedConfigDscr;
+ 269   2         }
+ 270   1         
+ 271   1         EZUSB_IRQ_CLEAR();
+ 272   1         USBIRQ = bmURES;         // Clear URES IRQ
+ 273   1      }
+ 274          
+ 275          void ISR_Susp(void) interrupt 0
+ 276          {
+ 277   1         Sleep = TRUE;
+ 278   1         EZUSB_IRQ_CLEAR();
+ 279   1         USBIRQ = bmSUSP;
+ 280   1      }
+ 281          
+ 282          void ISR_Highspeed(void) interrupt 0
+ 283          {
+ 284   1         if (EZUSB_HIGHSPEED())
+ 285   1         {
+ 286   2            pConfigDscr = pHighSpeedConfigDscr;
+ 287   2            pOtherConfigDscr = pFullSpeedConfigDscr;
+ 288   2         }
+ 289   1         else
+ 290   1         {
+ 291   2            pConfigDscr = pFullSpeedConfigDscr;
+ 292   2            pOtherConfigDscr = pHighSpeedConfigDscr;
+ 293   2         }
+ 294   1      
+ 295   1         EZUSB_IRQ_CLEAR();
+ 296   1         USBIRQ = bmHSGRANT;
+ 297   1      }
+ 298          void ISR_Ep0ack(void) interrupt 0
+ 299          {
+ 300   1      }
+ 301          void ISR_Stub(void) interrupt 0
+ 302          {
+ 303   1      }
+C51 COMPILER V7.06   IBN                                                                   06/13/2012 13:37:15 PAGE 6   
+
+ 304          void ISR_Ep0in(void) interrupt 0
+ 305          {
+ 306   1      }
+ 307          void ISR_Ep0out(void) interrupt 0
+ 308          {
+ 309   1      }
+ 310          void ISR_Ep1in(void) interrupt 0
+ 311          {
+ 312   1      }
+ 313          void ISR_Ep1out(void) interrupt 0
+ 314          {
+ 315   1      }
+ 316          void ISR_Ep2inout(void) interrupt 0
+ 317          {
+ 318   1      }
+ 319          void ISR_Ep4inout(void) interrupt 0
+ 320          {
+ 321   1      }
+ 322          void ISR_Ep6inout(void) interrupt 0
+ 323          {
+ 324   1      }
+ 325          void ISR_Ep8inout(void) interrupt 0
+ 326          {
+ 327   1      }
+ 328          void ISR_Ibn(void) interrupt 0
+ 329          {
+ 330   1         int i;
+ 331   1      
+ 332   1         // disable IBN for all endpoints
+ 333   1         IBNIE = 0x00;
+ 334   1      
+ 335   1         EZUSB_IRQ_CLEAR();         // clear the global USB IRQ
+ 336   1      
+ 337   1         // Find the EP with its IBN bit set
+ 338   1         for (i=0;i<8;i++)
+ 339   1         {
+ 340   2            if (IBNIRQ & (1 << i))
+ 341   2            {
+ 342   3               IbnFlag |= (1 << i);       // set the appropriate IBN flag bit
+ 343   3               IBNIRQ |= (1 << i);        // clear the IBN IRQ for this endpoint
+ 344   3            }
+ 345   2         }
+ 346   1      
+ 347   1         NAKIRQ |= bmBIT0;          // clear the global IBN IRQ
+ 348   1      
+ 349   1         // re-enable IBN interrupt for any endpoints that don't already have
+ 350   1         // an IBN pending in IbnFlag
+ 351   1         IBNIE = (bmEP6IBN | bmEP8IBN) & ~IbnFlag;
+ 352   1      }
+ 353          
+ 354          void ISR_Ep0pingnak(void) interrupt 0
+ 355          {
+ 356   1      }
+ 357          void ISR_Ep1pingnak(void) interrupt 0
+ 358          {
+ 359   1      }
+ 360          void ISR_Ep2pingnak(void) interrupt 0
+ 361          {
+ 362   1      }
+ 363          void ISR_Ep4pingnak(void) interrupt 0
+ 364          {
+ 365   1      }
+C51 COMPILER V7.06   IBN                                                                   06/13/2012 13:37:15 PAGE 7   
+
+ 366          void ISR_Ep6pingnak(void) interrupt 0
+ 367          {
+ 368   1      }
+ 369          void ISR_Ep8pingnak(void) interrupt 0
+ 370          {
+ 371   1      }
+ 372          void ISR_Errorlimit(void) interrupt 0
+ 373          {
+ 374   1      }
+ 375          void ISR_Ep2piderror(void) interrupt 0
+ 376          {
+ 377   1      }
+ 378          void ISR_Ep4piderror(void) interrupt 0
+ 379          {
+ 380   1      }
+ 381          void ISR_Ep6piderror(void) interrupt 0
+ 382          {
+ 383   1      }
+ 384          void ISR_Ep8piderror(void) interrupt 0
+ 385          {
+ 386   1      }
+ 387          void ISR_Ep2pflag(void) interrupt 0
+ 388          {
+ 389   1      }
+ 390          void ISR_Ep4pflag(void) interrupt 0
+ 391          {
+ 392   1      }
+ 393          void ISR_Ep6pflag(void) interrupt 0
+ 394          {
+ 395   1      }
+ 396          void ISR_Ep8pflag(void) interrupt 0
+ 397          {
+ 398   1      }
+ 399          void ISR_Ep2eflag(void) interrupt 0
+ 400          {
+ 401   1      }
+ 402          void ISR_Ep4eflag(void) interrupt 0
+ 403          {
+ 404   1      }
+ 405          void ISR_Ep6eflag(void) interrupt 0
+ 406          {
+ 407   1      }
+ 408          void ISR_Ep8eflag(void) interrupt 0
+ 409          {
+ 410   1      }
+ 411          void ISR_Ep2fflag(void) interrupt 0
+ 412          {
+ 413   1      }
+ 414          void ISR_Ep4fflag(void) interrupt 0
+ 415          {
+ 416   1      }
+ 417          void ISR_Ep6fflag(void) interrupt 0
+ 418          {
+ 419   1      }
+ 420          void ISR_Ep8fflag(void) interrupt 0
+ 421          {
+ 422   1      }
+ 423          void ISR_GpifComplete(void) interrupt 0
+ 424          {
+ 425   1      }
+ 426          void ISR_GpifWaveform(void) interrupt 0
+ 427          {
+C51 COMPILER V7.06   IBN                                                                   06/13/2012 13:37:15 PAGE 8   
+
+ 428   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    808    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      3       4
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

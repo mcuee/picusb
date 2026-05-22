@@ -1,0 +1,27 @@
+<html>
+<body>
+<pre>
+<h1>µVision2 Build Log</h1>
+<h2>Project:</h2>
+C:\Cypress\USB\CY3684_EZ-USB_FX2LP_DVK\1.1\Firmware\Pingnak\pingnak.uv2
+Project File Date:  06/07/2012
+
+<h2>Output:</h2>
+Build target 'Target 1'
+compiling pingnak.c...
+compiling fw.c...
+assembling dscr.a51...
+dscr.a51(83): error A34: ',' EXPECTED
+Target not created
+Build target 'Target 1'
+assembling dscr.a51...
+linking...
+Program Size: data=45.5 xdata=4473 code=2246
+creating hex file from "pingnak"...
+User command #1: ..\..\Bin\hex2bix -i -f 0xC2 -o pingnak.iic pingnak.hex
+Intel Hex file to EZ-USB Binary file conversion utility
+Copyright (c) 2012-2013, Cypress Semiconductor Inc.
+2287 Bytes written.
+Total Code Bytes = 2246
+Conversion completed successfully.
+"pingnak" - 0 Error(s), 0 Warning(s).

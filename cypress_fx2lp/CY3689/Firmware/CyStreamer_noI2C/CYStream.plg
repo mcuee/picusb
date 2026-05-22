@@ -1,0 +1,65 @@
+<html>
+<body>
+<pre>
+<h1>µVision2 Build Log</h1>
+<h2>Project:</h2>
+C:\Cypress\USB\CY3689 EZ-USB FX2LP DISCOVERY KIT\1.0\Firmware\CyStreamer_noI2C\CYStream.uv2
+Project File Date:  07/15/2021
+
+<h2>Output:</h2>
+Build target 'Target 1'
+assembling dscr.a51...
+compiling fw.c...
+compiling CYStream.c...
+assembling USBJmpTb.a51...
+A51 MACRO ASSEMBLER V7.09 - SN: C1F8U-L1238D
+COPYRIGHT KEIL ELEKTRONIK GmbH 1987 - 2004
+"C:\Keil\C51\BIN\A51.EXE" "..\..\Target\Lib\LP\USBJmpTb.a51" SET (SMALL) DEBUG PRINT(.\USBJmpTb.lst) OBJECT(.\USBJmpTb.obj) EP
+A51 FATAL ERROR -
+  FILE:       ..\..\Target\Lib\LP\USBJmpTb.a51
+  ERROR:      FILE DOES NOT EXIST
+A51 TERMINATED.
+Target not created
+Build target 'Target 1'
+assembling dscr.a51...
+compiling fw.c...
+compiling CYStream.c...
+linking...
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_EZUSB_WAITFOREEPROMWRITE?I2C
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_EZUSB_WRITEI2C_?I2C
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_EZUSB_READI2C_?I2C
+Program Size: data=51.5 xdata=4489 code=4494
+creating hex file from "CYStream"...
+User command #1: ..\..\Bin\hex2bix -i -f 0xC2 -o CYStream.iic CYStream.hex
+--- User Command terminated, Exit-Code = 4
+"CYStream" - 1 Error(s), 3 Warning(s).
+Build target 'Target 1'
+assembling dscr.a51...
+compiling fw.c...
+FW.C(190): warning C206: 'EZUSB_InitI2C': missing function-prototype
+compiling CYStream.c...
+linking...
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_EZUSB_WAITFOREEPROMWRITE?I2C
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_EZUSB_WRITEI2C_?I2C
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_EZUSB_READI2C_?I2C
+Program Size: data=51.5 xdata=4489 code=4494
+creating hex file from "CYStream"...
+User command #1: ..\..\Bin\hex2bix -i -f 0xC2 -o CYStream.iic CYStream.hex
+--- User Command terminated, Exit-Code = 4
+"CYStream" - 1 Error(s), 4 Warning(s).
+Build target 'Target 1'
+assembling dscr.a51...
+compiling fw.c...
+compiling CYStream.c...
+linking...
+Program Size: data=45.5 xdata=4489 code=3979
+creating hex file from "CYStream"...
+User command #1: ..\..\Bin\hex2bix -i -f 0xC2 -o CYStream.iic CYStream.hex
+--- User Command terminated, Exit-Code = 4
+"CYStream" - 1 Error(s), 0 Warning(s).
