@@ -1,0 +1,538 @@
+C51 COMPILER V7.07   FX2HID                                                                05/14/2023 21:16:31 PAGE 1   
+
+
+C51 COMPILER V7.07, COMPILATION OF MODULE FX2HID
+OBJECT MODULE PLACED IN fx2hid.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE fx2hid.c DEBUG OBJECTEXTEND
+
+stmt level    source
+
+   1          #pragma NOIV               // Do not generate interrupt vectors
+   2          /*
+   3          -----------------------------------------------------------------------------
+   4             File:      usbhidio_fx2.c
+   5             Contents:   Hooks required to implement USB peripheral function.
+   6          
+   7             This is an adaptation of the Cypress example FX2_Hid_Keyboard.c,
+   8             which was in turn adapted from Cypress's bulkloop.c 
+   9             (and is available on request from Cypress).
+  10          
+  11             The application communicates with the usbhdio host applications available from:
+  12           
+  13             www.Lvr.com/hidpage.htm
+  14          
+  15             This code requires the full (not evaluation) version of the Keil compiler.
+  16             Additions to the keyboard code are labeled with "usbhidio start" and "usbhidio end"
+  17             Unneeded keyboard code is commented out.
+  18            
+  19             Copyright (c) 2000 Cypress Semiconductor All rights reserved
+  20             with some changes by Jan Axelson (jan@Lvr.com) 
+  21          -----------------------------------------------------------------------------
+  22          */
+  23          
+  24          #include "fx2.h"
+  25          #include "fx2regs.h"
+  26          #include "fx2sdly.h"            // SYNCDELAY macro
+  27          
+  28          extern BOOL GotSUD;             // Received setup data flag
+  29          extern BOOL Sleep;
+  30          extern BOOL Rwuen;
+  31          extern BOOL Selfpwr;
+  32          
+  33          #define min(a,b) (((a)<(b))?(a):(b))
+  34          
+  35          #define GD_HID  0x21
+  36          #define GD_REPORT       0x22
+  37          #define CR_SET_REPORT 0x09
+  38          #define HID_OUTPUT_REPORT 2
+  39          
+  40          #define BTN_ADDR                0x41
+  41          #define LED_ADDR                0x42
+  42          
+  43          #define PF_IDLE                 0
+  44          #define PF_GETKEYS              1
+  45          
+  46          #define KEY_WAKEUP              0
+  47          #define KEY_F1                  1
+  48          #define KEY_F2                  2
+  49          #define KEY_F3                  3
+  50          
+  51          WORD    pHIDDscr;
+  52          WORD    pReportDscr;
+  53          WORD    pReportDscrEnd;
+  54          extern code HIDDscr;
+  55          extern code ReportDscr; 
+C51 COMPILER V7.07   FX2HID                                                                05/14/2023 21:16:31 PAGE 2   
+
+  56          extern code ReportDscrEnd;
+  57          
+  58          BYTE Configuration;             // Current configuration
+  59          BYTE AlternateSetting;          // Alternate settings
+  60          
+  61          BYTE    Configuration;          // Current configuration
+  62          BYTE    AlternateSetting;       // Alternate settings
+  63          
+  64          BYTE buttons;
+  65          BYTE oldbuttons;
+  66          BYTE leds = 0xFF;
+  67          
+  68          BYTE read_buttons (void);
+  69          void write_leds (BYTE d);
+  70          
+  71          #define VR_NAKALL_ON    0xD0
+  72          #define VR_NAKALL_OFF   0xD1
+  73          //-----------------------------------------------------------------------------
+  74          // Task Dispatcher hooks
+  75          //   The following hooks are called by the task dispatcher.
+  76          //-----------------------------------------------------------------------------
+  77          
+  78          // read_buttons and write_leds are unused by usbhidio
+  79          /*
+  80          BYTE read_buttons (void)
+  81          {
+  82                  BYTE d;
+  83          
+  84                  while (I2CS & 0x40);    //Wait for stop to be done
+  85                  I2CS = 0x80;                    //Set start condition
+  86                  I2DAT = BTN_ADDR;               //Write button address
+  87                  while (!(I2CS & 0x01)); //Wait for done
+  88                  I2CS = 0x20;                    //Set last read
+  89                  d = I2DAT;                              //Dummy read
+  90                  while (!(I2CS & 0x01)); //Wait for done
+  91                  I2CS = 0x40;                    //Set stop bit
+  92                  return(I2DAT);                  //Read the data
+  93          }
+  94          
+  95          
+  96          void write_leds (BYTE d)
+  97          {
+  98                  while (I2CS & 0x40);    //Wait for stop to be done
+  99                  I2CS = 0x80;                    //Set start condition
+ 100                  I2DAT = LED_ADDR;               //Write led address
+ 101                  while (!(I2CS & 0x01)); //Wait for done
+ 102                  I2DAT = d;                              //Write data
+ 103                  while (!(I2CS & 0x01)); //Wait for done
+ 104                  I2CS = 0x40;                    //Set stop bit
+ 105          }
+ 106          */
+ 107          
+ 108          
+ 109          void TD_Init(void)             // Called once at startup
+ 110          {
+ 111   1         // set the CPU clock to 48MHz
+ 112   1         CPUCS = ((CPUCS & ~bmCLKSPD) | bmCLKSPD1) ;
+ 113   1      
+ 114   1         // set the slave FIFO interface to 48MHz
+ 115   1         IFCONFIG |= 0x40;
+ 116   1      
+ 117   1        // Registers which require a synchronization delay, see section 15.14
+C51 COMPILER V7.07   FX2HID                                                                05/14/2023 21:16:31 PAGE 3   
+
+ 118   1        // FIFORESET        FIFOPINPOLAR
+ 119   1        // INPKTEND         OUTPKTEND
+ 120   1        // EPxBCH:L         REVCTL
+ 121   1        // GPIFTCB3         GPIFTCB2
+ 122   1        // GPIFTCB1         GPIFTCB0
+ 123   1        // EPxFIFOPFH:L     EPxAUTOINLENH:L
+ 124   1        // EPxFIFOCFG       EPxGPIFFLGSEL
+ 125   1        // PINFLAGSxx       EPxFIFOIRQ
+ 126   1        // EPxFIFOIE        GPIFIRQ
+ 127   1        // GPIFIE           GPIFADRH:L
+ 128   1        // UDMACRCH:L       EPxGPIFTRIG
+ 129   1        // GPIFTRIG
+ 130   1        
+ 131   1        // Note: The pre-REVE EPxGPIFTCH/L register are affected, as well...
+ 132   1        //      ...these have been replaced by GPIFTC[B3:B0] registers
+ 133   1      
+ 134   1        // default: all endpoints have their VALID bit set
+ 135   1        // default: TYPE1 = 1 and TYPE0 = 0 --> BULK  
+ 136   1        // default: EP2 and EP4 DIR bits are 0 (OUT direction)
+ 137   1        // default: EP6 and EP8 DIR bits are 1 (IN direction)
+ 138   1        // default: EP2, EP4, EP6, and EP8 are double buffered
+ 139   1      
+ 140   1        // we are just using the default values, yes this is not necessary...
+ 141   1        EP1OUTCFG = 0xA0;
+ 142   1        EP1INCFG = 0xA0;
+ 143   1        SYNCDELAY;                    // see TRM section 15.14
+ 144   1        EP2CFG = 0xA2;
+ 145   1        SYNCDELAY;                    
+ 146   1        EP4CFG = 0xA0;
+ 147   1        SYNCDELAY;                    
+ 148   1        EP6CFG = 0xE2;
+ 149   1        SYNCDELAY;                    
+ 150   1        EP8CFG = 0xE0;
+ 151   1      
+ 152   1        // out endpoints do not come up armed
+ 153   1        
+ 154   1        // since the defaults are double buffered we must write dummy byte counts twice
+ 155   1        SYNCDELAY;                    
+ 156   1        EP2BCL = 0x80;                // arm EP2OUT by writing byte count w/skip.
+ 157   1        SYNCDELAY;                    
+ 158   1        EP2BCL = 0x80;
+ 159   1        SYNCDELAY;                    
+ 160   1        EP4BCL = 0x80;                // arm EP4OUT by writing byte count w/skip.
+ 161   1        SYNCDELAY;                    
+ 162   1        EP4BCL = 0x80;    
+ 163   1      
+ 164   1        // enable dual autopointer feature
+ 165   1        AUTOPTRSETUP |= 0x01;
+ 166   1      
+ 167   1        Rwuen = TRUE;                 // Enable remote-wakeup
+ 168   1      
+ 169   1      }
+ 170          
+ 171          
+ 172          void TD_Poll(void)              // Called repeatedly while the device is idle
+ 173          {
+ 174   1              if( !(EP1INCS & 0x02) ) // Is the EP1INBUF available,
+ 175   1              {
+ 176   2      
+ 177   2      //              This keyboard code is unneeded
+ 178   2      /*      
+ 179   2              buttons = read_buttons();
+C51 COMPILER V7.07   FX2HID                                                                05/14/2023 21:16:31 PAGE 4   
+
+ 180   2                      if (buttons == read_buttons())  //Debounce
+ 181   2                      {
+ 182   2                              buttons &= 0x0F;
+ 183   2                              if ((oldbuttons - buttons) != 0)        //Change in button state
+ 184   2                              {
+ 185   2                                      if (buttons & 1)        //Shift
+ 186   2                                              EP1INBUF[0] = 0;
+ 187   2                                      else
+ 188   2                                              EP1INBUF[0] = 2;
+ 189   2                                      if (buttons & 2)        //a
+ 190   2                                              EP1INBUF[2] = 0;
+ 191   2                                      else
+ 192   2                                              EP1INBUF[2] = 4;
+ 193   2                                      if (buttons & 4)        //b
+ 194   2                                              EP1INBUF[3] = 0;
+ 195   2                                      else
+ 196   2                                              EP1INBUF[3] = 5;
+ 197   2                                      if (buttons & 8)        //c
+ 198   2                                              EP1INBUF[4] = 0;
+ 199   2                                      else
+ 200   2                                              EP1INBUF[4] = 6;
+ 201   2                                      EP1INBUF[1] = 0;
+ 202   2                                      EP1INBC = 5;
+ 203   2                              }
+ 204   2                              oldbuttons = buttons;
+ 205   2                      }
+ 206   2      */
+ 207   2              }
+ 208   1              if( !(EP1OUTCS & 0x02) )        // Is there something available in EP1OUTBUF
+ 209   1              {
+ 210   2      
+ 211   2      //              This keyboard code is unneeded by usbhidio
+ 212   2      /*
+ 213   2                      leds = 0xFF;    //Turn all off
+ 214   2                      if (EP1OUTBUF[0] & 0x02)        //Caps
+ 215   2                              leds &= 0xBF;
+ 216   2                      if (EP1OUTBUF[0] & 0x01)        //Scroll
+ 217   2                              leds &= 0xF7;
+ 218   2                      if (EP1OUTBUF[0] & 0x04)        //Num
+ 219   2                              leds &= 0xFE;
+ 220   2                      write_leds (leds);
+ 221   2      */
+ 222   2      
+ 223   2      // usbhidio code start
+ 224   2      
+ 225   2      // Copy bytes received on the OUT endpoint to the IN endpoint. 
+ 226   2                      EP1INBUF[0] = EP1OUTBUF[0];
+ 227   2                      EP1INBUF[1] = EP1OUTBUF[1];
+ 228   2                      EP1INBUF[2] = EP1OUTBUF[2];
+ 229   2                      EP1INBUF[3] = EP1OUTBUF[3];
+ 230   2                      EP1INBUF[4] = EP1OUTBUF[4];
+ 231   2                      EP1INBUF[5] = EP1OUTBUF[5];
+ 232   2                      EP1INBUF[6] = EP1OUTBUF[6];
+ 233   2                      EP1INBUF[7] = EP1OUTBUF[7];
+ 234   2      
+ 235   2      // Rearm the IN endpoint buffer to enable sending a report.
+ 236   2      // The value equals the report size.
+ 237   2                      EP1INBC = 8;                    
+ 238   2      
+ 239   2      // usbhidiocode end
+ 240   2      
+ 241   2                      EP1OUTBC = 0;                           //Rearm the OUT endpoint buffer to enable receiving a report.
+C51 COMPILER V7.07   FX2HID                                                                05/14/2023 21:16:31 PAGE 5   
+
+ 242   2      
+ 243   2              } 
+ 244   1      }
+ 245          
+ 246          BOOL TD_Suspend(void)          // Called before the device goes into suspend mode
+ 247          {
+ 248   1         return(TRUE);
+ 249   1      }
+ 250          
+ 251          BOOL TD_Resume(void)          // Called after the device resumes
+ 252          {
+ 253   1         return(TRUE);
+ 254   1      }
+ 255          
+ 256          //-----------------------------------------------------------------------------
+ 257          // Device Request hooks
+ 258          //   The following hooks are called by the end point 0 device request parser.
+ 259          //-----------------------------------------------------------------------------
+ 260          
+ 261          BOOL DR_GetDescriptor(void)
+ 262          {
+ 263   1                      return(TRUE);
+ 264   1      }
+ 265          
+ 266          BOOL DR_SetConfiguration(void)   // Called when a Set Configuration command is received
+ 267          {
+ 268   1         Configuration = SETUPDAT[2];
+ 269   1         return(TRUE);            // Handled by user code
+ 270   1      }
+ 271          
+ 272          BOOL DR_GetConfiguration(void)   // Called when a Get Configuration command is received
+ 273          {
+ 274   1         EP0BUF[0] = Configuration;
+ 275   1         EP0BCH = 0;
+ 276   1         EP0BCL = 1;
+ 277   1         return(TRUE);            // Handled by user code
+ 278   1      }
+ 279          
+ 280          BOOL DR_SetInterface(void)       // Called when a Set Interface command is received
+ 281          {
+ 282   1         AlternateSetting = SETUPDAT[2];
+ 283   1         return(TRUE);            // Handled by user code
+ 284   1      }
+ 285          
+ 286          BOOL DR_GetInterface(void)       // Called when a Set Interface command is received
+ 287          {
+ 288   1         EP0BUF[0] = AlternateSetting;
+ 289   1         EP0BCH = 0;
+ 290   1         EP0BCL = 1;
+ 291   1         return(TRUE);            // Handled by user code
+ 292   1      }
+ 293          
+ 294          BOOL DR_GetStatus(void)
+ 295          {
+ 296   1         return(TRUE);
+ 297   1      }
+ 298          
+ 299          BOOL DR_ClearFeature(void)
+ 300          {
+ 301   1         return(TRUE);
+ 302   1      }
+ 303          
+C51 COMPILER V7.07   FX2HID                                                                05/14/2023 21:16:31 PAGE 6   
+
+ 304          BOOL DR_SetFeature(void)
+ 305          {
+ 306   1         return(TRUE);
+ 307   1      }
+ 308          
+ 309          BOOL DR_VendorCmnd(void)
+ 310          {
+ 311   1        BYTE tmp;
+ 312   1        
+ 313   1        switch (SETUPDAT[1])
+ 314   1        {
+ 315   2           case VR_NAKALL_ON:
+ 316   2              tmp = FIFORESET;
+ 317   2              tmp |= bmNAKALL;      
+ 318   2              SYNCDELAY;                    
+ 319   2              FIFORESET = tmp;
+ 320   2              break;
+ 321   2           case VR_NAKALL_OFF:
+ 322   2              tmp = FIFORESET;
+ 323   2              tmp &= ~bmNAKALL;      
+ 324   2              SYNCDELAY;                    
+ 325   2              FIFORESET = tmp;
+ 326   2              break;
+ 327   2           default:
+ 328   2              return(TRUE);
+ 329   2        }
+ 330   1      
+ 331   1        return(FALSE);
+ 332   1      }
+ 333          
+ 334          //-----------------------------------------------------------------------------
+ 335          // USB Interrupt Handlers
+ 336          //   The following functions are called by the USB interrupt jump table.
+ 337          //-----------------------------------------------------------------------------
+ 338          
+ 339          // Setup Data Available Interrupt Handler
+ 340          void ISR_Sudav(void) interrupt 0
+ 341          {
+ 342   1         GotSUD = TRUE;            // Set flag
+ 343   1         EZUSB_IRQ_CLEAR();
+ 344   1         USBIRQ = bmSUDAV;         // Clear SUDAV IRQ
+ 345   1      }
+ 346          
+ 347          // Setup Token Interrupt Handler
+ 348          void ISR_Sutok(void) interrupt 0
+ 349          {
+ 350   1         EZUSB_IRQ_CLEAR();
+ 351   1         USBIRQ = bmSUTOK;         // Clear SUTOK IRQ
+ 352   1      }
+ 353          
+ 354          void ISR_Sof(void) interrupt 0
+ 355          {
+ 356   1         EZUSB_IRQ_CLEAR();
+ 357   1         USBIRQ = bmSOF;            // Clear SOF IRQ
+ 358   1      }
+ 359          
+ 360          void ISR_Ures(void) interrupt 0
+ 361          {
+ 362   1         // whenever we get a USB reset, we should revert to full speed mode
+ 363   1         pConfigDscr = pFullSpeedConfigDscr;
+ 364   1         ((CONFIGDSCR xdata *) pConfigDscr)->type = CONFIG_DSCR;
+ 365   1         pOtherConfigDscr = pHighSpeedConfigDscr;
+C51 COMPILER V7.07   FX2HID                                                                05/14/2023 21:16:31 PAGE 7   
+
+ 366   1         ((CONFIGDSCR xdata *) pOtherConfigDscr)->type = OTHERSPEED_DSCR;
+ 367   1      
+ 368   1         EZUSB_IRQ_CLEAR();
+ 369   1         USBIRQ = bmURES;         // Clear URES IRQ
+ 370   1      }
+ 371          
+ 372          void ISR_Susp(void) interrupt 0
+ 373          {
+ 374   1         Sleep = TRUE;
+ 375   1         EZUSB_IRQ_CLEAR();
+ 376   1         USBIRQ = bmSUSP;
+ 377   1      }
+ 378          
+ 379          void ISR_Highspeed(void) interrupt 0
+ 380          {
+ 381   1         if (EZUSB_HIGHSPEED())
+ 382   1         {
+ 383   2            pConfigDscr = pHighSpeedConfigDscr;
+ 384   2            ((CONFIGDSCR xdata *) pConfigDscr)->type = CONFIG_DSCR;
+ 385   2            pOtherConfigDscr = pFullSpeedConfigDscr;
+ 386   2            ((CONFIGDSCR xdata *) pOtherConfigDscr)->type = OTHERSPEED_DSCR;
+ 387   2         }
+ 388   1      
+ 389   1         EZUSB_IRQ_CLEAR();
+ 390   1         USBIRQ = bmHSGRANT;
+ 391   1      }
+ 392          void ISR_Ep0ack(void) interrupt 0
+ 393          {
+ 394   1      }
+ 395          void ISR_Stub(void) interrupt 0
+ 396          {
+ 397   1      }
+ 398          void ISR_Ep0in(void) interrupt 0
+ 399          {
+ 400   1      }
+ 401          void ISR_Ep0out(void) interrupt 0
+ 402          {
+ 403   1      }
+ 404          void ISR_Ep1in(void) interrupt 0
+ 405          {
+ 406   1      }
+ 407          void ISR_Ep1out(void) interrupt 0
+ 408          {
+ 409   1      }
+ 410          void ISR_Ep2inout(void) interrupt 0
+ 411          {
+ 412   1      }
+ 413          void ISR_Ep4inout(void) interrupt 0
+ 414          {
+ 415   1      }
+ 416          void ISR_Ep6inout(void) interrupt 0
+ 417          {
+ 418   1      }
+ 419          void ISR_Ep8inout(void) interrupt 0
+ 420          {
+ 421   1      }
+ 422          void ISR_Ibn(void) interrupt 0
+ 423          {
+ 424   1      }
+ 425          void ISR_Ep0pingnak(void) interrupt 0
+ 426          {
+ 427   1      }
+C51 COMPILER V7.07   FX2HID                                                                05/14/2023 21:16:31 PAGE 8   
+
+ 428          void ISR_Ep1pingnak(void) interrupt 0
+ 429          {
+ 430   1      }
+ 431          void ISR_Ep2pingnak(void) interrupt 0
+ 432          {
+ 433   1      }
+ 434          void ISR_Ep4pingnak(void) interrupt 0
+ 435          {
+ 436   1      }
+ 437          void ISR_Ep6pingnak(void) interrupt 0
+ 438          {
+ 439   1      }
+ 440          void ISR_Ep8pingnak(void) interrupt 0
+ 441          {
+ 442   1      }
+ 443          void ISR_Errorlimit(void) interrupt 0
+ 444          {
+ 445   1      }
+ 446          void ISR_Ep2piderror(void) interrupt 0
+ 447          {
+ 448   1      }
+ 449          void ISR_Ep4piderror(void) interrupt 0
+ 450          {
+ 451   1      }
+ 452          void ISR_Ep6piderror(void) interrupt 0
+ 453          {
+ 454   1      }
+ 455          void ISR_Ep8piderror(void) interrupt 0
+ 456          {
+ 457   1      }
+ 458          void ISR_Ep2pflag(void) interrupt 0
+ 459          {
+ 460   1      }
+ 461          void ISR_Ep4pflag(void) interrupt 0
+ 462          {
+ 463   1      }
+ 464          void ISR_Ep6pflag(void) interrupt 0
+ 465          {
+ 466   1      }
+ 467          void ISR_Ep8pflag(void) interrupt 0
+ 468          {
+ 469   1      }
+ 470          void ISR_Ep2eflag(void) interrupt 0
+ 471          {
+ 472   1      }
+ 473          void ISR_Ep4eflag(void) interrupt 0
+ 474          {
+ 475   1      }
+ 476          void ISR_Ep6eflag(void) interrupt 0
+ 477          {
+ 478   1      }
+ 479          void ISR_Ep8eflag(void) interrupt 0
+ 480          {
+ 481   1      }
+ 482          void ISR_Ep2fflag(void) interrupt 0
+ 483          {
+ 484   1      }
+ 485          void ISR_Ep4fflag(void) interrupt 0
+ 486          {
+ 487   1      }
+ 488          void ISR_Ep6fflag(void) interrupt 0
+ 489          {
+C51 COMPILER V7.07   FX2HID                                                                05/14/2023 21:16:31 PAGE 9   
+
+ 490   1      }
+ 491          void ISR_Ep8fflag(void) interrupt 0
+ 492          {
+ 493   1      }
+ 494          void ISR_GpifComplete(void) interrupt 0
+ 495          {
+ 496   1      }
+ 497          void ISR_GpifWaveform(void) interrupt 0
+ 498          {
+ 499   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    526    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     11    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

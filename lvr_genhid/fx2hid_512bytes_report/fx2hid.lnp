@@ -1,0 +1,9 @@
+"dscr.obj",
+"fw.obj",
+"fx2hid.obj",
+"C:\Cypress\USB\Target\Lib\LP\EZUSB.LIB",
+"C:\Cypress\USB\Target\Lib\LP\USBJmpTb.OBJ" 
+TO "fx2hid" 
+RAMSIZE(256) 
+CODE( 0x80 )
+XDATA( 0x1000 )

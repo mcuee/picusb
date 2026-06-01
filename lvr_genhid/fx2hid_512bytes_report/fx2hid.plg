@@ -1,0 +1,17 @@
+<html>
+<body>
+<pre>
+<h1>µVision2 Build Log</h1>
+<h2>Project:</h2>
+C:\work\libusb\fx2hid\fx2hid_512bytes_report\fx2hid.uv2
+Project File Date:  05/16/2023
+
+<h2>Output:</h2>
+Build target 'Target 1'
+assembling dscr.a51...
+compiling fw.c...
+compiling fx2hid.c...
+linking...
+Program Size: data=53.5 xdata=4473 code=2499
+creating hex file from "fx2hid"...
+"fx2hid" - 0 Error(s), 0 Warning(s).
